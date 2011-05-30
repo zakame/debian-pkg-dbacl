@@ -1,0 +1,95 @@
+dbacl (1.12-2.1) unstable; urgency=low
+
+  * Non-maintainer upload.
+  * Replace libreadline5-dev build-dependency with libreadline-gplv2-dev
+    (Closes: #553745)
+  * Correct paths to documentation on Debian systems in manpages,
+    01_manpage_doc_paths.diff . (Closes: #628587)
+
+ -- Ryan Kavanagh <ryanakca@kubuntu.org>  Mon, 30 May 2011 09:51:17 -0400
+
+dbacl (1.12-2) unstable; urgency=low
+
+  * Acknowledge NMU by bddebian@, thanks
+  * debian/control:
+    + Update maintainer email
+    + Update Standards-Version
+    + Add ${misc:Depends}
+    + Remove flex from Build-Depends
+  * debian/patches:
+    + Fix bashism, patch courtesy of Chris Lamb <chris@chris-lamb.co.uk>
+      (Closes: #489560)
+    + Rebuild autotools (but don't include autom4te.cache)
+
+ -- Zak B. Elep <zakame@zakame.net>  Thu, 11 Dec 2008 23:53:55 +0800
+
+dbacl (1.12-1.1) unstable; urgency=low
+
+  * Non-maintainer upload.
+  * Remove 20_autotools_update.patch. (Closes: #442545, #424175).
+    + Patch was only updating autom4te.cache/ files.
+  * Update watch file. (Closes: #450145).
+  * Move Homepage from package description to source header.
+  * Update FSF address in copyright.
+  * Bump debhelper build-dep and compat to 5.
+  * Bump Standards Version to 3.7.3. (No changes needed).
+
+ -- Barry deFreese <bddebian@comcast.net>  Fri, 04 Apr 2008 12:37:42 -0400
+
+dbacl (1.12-1) unstable; urgency=low
+
+  * New upstream release
+    + `dbacl -V' now exits with status 0.  (Closes: #339394)
+  * debian/rules:
+    + Upstream now fixes TREC file permissions.  However some new scripts got
+      added, so this time its a a+x fix instead of a-x.
+  * debian/patches:
+    + Removed 10_slang2_conversion.patch from Clint, now merged upstream.
+    + Updated 20_autotools_update.patch .
+
+ -- Zak B. Elep <zakame@spunge.org>  Sun, 26 Mar 2006 22:35:35 +0800
+
+dbacl (1.11-3) unstable; urgency=low
+
+  * New maintainer. (Closes: #348949)
+  * Switch to cdbs + debhelper.
+    - Move docs in share/dbacl to proper Debian location.
+    - Fix permissions on TREC files.
+  * debian/control:
+    - Remove `A' from one-line Description.
+    - Add Homepage in full Description.
+    - Remove procmail from Build-Depends upon suggestion by Florian
+      Ragwitz.
+  * debian/patches:
+    - Add 10_slang2_conversion.patch from Clint.
+    - Add 20_autotools_update.patch using AM_MAINTAINER_MODE.
+
+ -- Zak B. Elep <zakame@spunge.org>  Mon, 13 Feb 2006 22:55:40 +0800
+
+dbacl (1.11-2) unstable; urgency=medium
+
+  * Switch to slang2.
+
+ -- Clint Adams <schizo@debian.org>  Sun,  4 Dec 2005 10:09:06 -0500
+
+dbacl (1.11-1) unstable; urgency=low
+
+  * New upstream version. 
+
+ -- Clint Adams <schizo@debian.org>  Sat, 15 Oct 2005 00:16:01 -0400
+
+dbacl (1.9-2) unstable; urgency=low
+
+  * Bump Standards-Version to 3.6.2.
+  * Change build-dep from slang1-utf8-dev to libslang1-utf8-dev.
+    closes: #333909.
+  * Add upstream email address to the copyright file for some
+    reason.  closes: #325823.
+
+ -- Clint Adams <schizo@debian.org>  Sat, 15 Oct 2005 00:01:23 -0400
+
+dbacl (1.9-1) unstable; urgency=low
+
+  * Initial packaging.  closes: #168570.
+
+ -- Clint Adams <schizo@debian.org>  Sat,  7 May 2005 12:59:53 -0400

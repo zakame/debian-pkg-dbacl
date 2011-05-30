@@ -1,0 +1,60 @@
+Description: Fix paths for manpage
+Author: Ryan Kavanagh <ryanakca@kubuntu.org>
+Origin: vendor
+Bug-Debian: http://bugs.debian.org/628587
+Last-Update: 2011-05-30
+Index: dbacl-1.12/man/bayesol.1in
+===================================================================
+--- dbacl-1.12.orig/man/bayesol.1in	2011-05-30 09:58:20.388835559 -0400
++++ dbacl-1.12/man/bayesol.1in	2011-05-30 09:59:19.705129690 -0400
+@@ -161,9 +161,9 @@
+ % dbacl -c one -c two -c three sample.txt -vna | bayesol -c toy.risk -v
+ .ad
+ .PP
+-See @PKGDATADIR@/doc/costs.ps for a description of the algorithm used.
++See @PKGDOCDIR@/costs.ps for a description of the algorithm used.
+ See also
+-@PKGDATADIR@/doc/tutorial.html for a more detailed overview.
++@PKGDOCDIR@/tutorial.html for a more detailed overview.
+ .SH SOURCE
+ .PP
+ The source code for the latest version of this program is available at the
+Index: dbacl-1.12/man/dbacl.1in
+===================================================================
+--- dbacl-1.12.orig/man/dbacl.1in	2011-05-30 09:58:20.348835366 -0400
++++ dbacl-1.12/man/dbacl.1in	2011-05-30 09:59:19.709129718 -0400
+@@ -72,10 +72,10 @@
+ getting dbacl to classify reliably, read is_it_working.html.
+ The USAGE section of this manual page
+ also has some examples.
+-.IP @PKGDATADIR@/doc/dbacl.ps
+-.IP @PKGDATADIR@/doc/tutorial.html
+-.IP @PKGDATADIR@/doc/email.html
+-.IP @PKGDATADIR@/doc/is_it_working.html
++.IP @PKGDOCDIR@/dbacl.ps
++.IP @PKGDOCDIR@/tutorial.html
++.IP @PKGDOCDIR@/email.html
++.IP @PKGDOCDIR@/is_it_working.html
+ .PP
+ .B dbacl
+ uses a maximum entropy (minimum divergence) language model constructed
+Index: dbacl-1.12/man/Makefile.in
+===================================================================
+--- dbacl-1.12.orig/man/Makefile.in	2011-05-30 09:59:26.237162090 -0400
++++ dbacl-1.12/man/Makefile.in	2011-05-30 09:58:08.976778977 -0400
+@@ -17,6 +17,7 @@
+ top_srcdir = @top_srcdir@
+ VPATH = @srcdir@
+ pkgdatadir = $(datadir)/@PACKAGE@
++pkgdocdir = /usr/share/doc/dbacl
+ pkglibdir = $(libdir)/@PACKAGE@
+ pkgincludedir = $(includedir)/@PACKAGE@
+ top_builddir = ..
+@@ -354,6 +355,7 @@
+ 	cat $< \
+ 		| sed -e "s|[@]VERSION@|$(VERSION)|g" \
+ 		| sed -e "s|[@]PKGDATADIR@|$(pkgdatadir)|g" \
++		| sed -e "s|[@]PKGDOCDIR@|$(pkgdocdir)|g" \
+ 		> $@
+ # Tell versions [3.59,3.63) of GNU make to not export all variables.
+ # Otherwise a system limit (for SysV at least) may be exceeded.

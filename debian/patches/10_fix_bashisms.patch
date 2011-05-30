@@ -1,0 +1,17 @@
+# Fix bashism found by Raphael Geissert <atomo64@gmail.com>
+# Patch by Chris Lamb <chris@chris-lamb.co.uk>
+diff -urNd dbacl-1.12.orig/TREC/finalize dbacl-1.12/TREC/finalize
+--- dbacl-1.12.orig/TREC/finalize	2008-08-24 14:07:48.000000000 +0100
++++ dbacl-1.12/TREC/finalize	2008-08-24 14:08:51.000000000 +0100
+@@ -14,8 +14,8 @@
+ 	TOKS=`head -3 $W/db/$f | tail -1 | sed 's/.*_features //;s/ documents.*//'`
+ 	SIZ=`du -h $W/db/$f`
+ 	
+-	echo -e "$SIZ\thas learned $DOCS documents,\t$TOKS tokens."
++	printf "$SIZ\thas learned $DOCS documents,\t$TOKS tokens.\n"
+ done
+ 
+ 
+-exit 0
+\ No newline at end of file
++exit 0
