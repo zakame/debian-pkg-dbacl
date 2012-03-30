@@ -1,3 +1,19 @@
+dbacl 1.14:
+	* cleanup tempfiles in recalculate_reference_measure (thanks Marcin Mirosław)
+	* removed spherecl code (failed experiment).
+dbacl 1.13:
+	* updated licence from GPL2 to GPL3.
+	* new classifier command spherecl (unfinished, unusable). 
+	* new -Y switch.
+	* fine grained Mheaderid used for expanded token classes.
+	* rearrange options bitfield to make room for extra choices. 
+	* new formula used for -U score.
+	* new -O switch. Updated man page.
+	* new -z switch.
+	* fixed compile problems in HPUX (thanks to Frank Spaniak).
+	* new -F switch for classifying several files per invocation.
+	* new checkpoint and restart scripts in the TREC directory.
+	* extra debug information for -d switch.
 dbacl 1.12:
 	* some tests in make check need C locale (found by Szperacz).
 	* swap order of #include "util.h" and #include<math.h> for gcc 4.0

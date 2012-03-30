@@ -13,9 +13,21 @@ prerequisite_command() {
 
 prerequisite_command $0 tr
 
+DBACL_PATH="`pwd`/`basename $0 .sh`_`date +"%Y%m%dT%H%M%S"`"
+export DBACL_PATH
+
+mkdir "$DBACL_PATH"
+
+echo 'header: =?US-ASCII?Q?=3D=3FUS-ASCII=3FQ=3Ftest=3F=3D?=' > $DBACL_PATH/out0
+
 echo 'header: =?US-ASCII?Q?=3D=3FUS-ASCII=3FQ=3F=3D3D=3D3FUS-ASCII=3D3FQ=3D3Ftest=3D3F=3D3D=3F=3D?=' \
     | $DBACL -R -D -T email -T email:xheaders \
     | grep header \
-    | sed 's/^/"/;s/$/"/' \
-    | xargs test 'header: =?US-ASCII?Q?=3D=3FUS-ASCII=3FQ=3Ftest=3F=3D?=' =
+    > $DBACL_PATH/out1
 
+diff $DBACL_PATH/out0 $DBACL_PATH/out1
+
+RESULT=$?
+rm -rf "$DBACL_PATH"
+
+exit $RESULT

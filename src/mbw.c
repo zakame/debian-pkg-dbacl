@@ -3,7 +3,7 @@
  *  
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
+ * the Free Software Foundation; either version 3 of the License, or
  * (at your option) any later version.
  * 
  * This program is distributed in the hope that it will be useful,
@@ -13,7 +13,7 @@
  * 
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA.
  * 
  * Author:   Laird Breyer <laird@lbreyer.com>
  */
@@ -54,6 +54,7 @@
 #include "mbw.h"
 
 extern options_t u_options;
+extern charparser_t m_cp;
 extern options_t m_options;
 
 extern myregex_t re[MAX_RE];
@@ -477,6 +478,9 @@ bool_t mbw_prefix(flush_cache)(mbw_prefix(decoding_cache) *dc, mbw_t *line, bool
  * DECODING FUNCTIONS                                      *
  ***********************************************************/
 
+
+#define REPNUL mbw_lit('\t')
+
 /* 
  * this code generates b64_line_filter2() and w_b64_line_filter2() 
  * works ok so long as q <= line, or q >> line 
@@ -485,7 +489,8 @@ bool_t mbw_prefix(flush_cache)(mbw_prefix(decoding_cache) *dc, mbw_t *line, bool
  * The string which is written is always NUL terminated, but if NULs 
  * were decoded in the middle, those are replaced by tabs (we could
  * also replace them with a more neutral char, but the cache flushing
- * code breaks up lines on spaces, and we want to take advantage of that)
+ * code breaks up lines on spaces, and we want to take advantage of that. See
+ * the REPNUL define)
  */
 mbw_t *mbw_prefix(b64_line_filter2)(mbw_t *line, mbw_t *q) {
   mbw_t *p = line;
@@ -500,15 +505,15 @@ mbw_t *mbw_prefix(b64_line_filter2)(mbw_t *line, mbw_t *q) {
 	if( buf_start == buf_end ) {
 	  buf_start = buf;
 	  *q = (mbw_prefix(b64_code)(buf[0])<<2) + (mbw_prefix(b64_code)(buf[1])>>4);
-	  if( !*q ) { *q = mbw_lit('\t'); }
+	  if( !*q ) { *q = REPNUL; }
 	  q++;
 	  if( buf[2] != mbw_lit('=') ) {
 	    *q = (mbw_prefix(b64_code)(buf[1])<<4) + (mbw_prefix(b64_code)(buf[2])>>2);
-	    if( !*q ) { *q = mbw_lit('\t'); }
+	    if( !*q ) { *q = REPNUL; }
 	    q++;
 	    if( buf[3] != mbw_lit('=') ) {
 	      *q = (mbw_prefix(b64_code)(buf[2])<<6) + mbw_prefix(b64_code)(buf[3]);	    
-	      if( !*q ) { *q = mbw_lit('\t'); }
+	      if( !*q ) { *q = REPNUL; }
 	      q++;
 	    } else {
 	      break;
@@ -661,6 +666,27 @@ bool_t mbw_prefix(qp_line_filter)(mbw_prefix(decoding_cache) *qpcache,
 
 #define ISO8859(c) ( RANGE(c,0xA1,0xFE) )
 
+/* atom without slash */
+static char rfc2822_atom[256] = {
+  0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
+  0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
+  0, '!',   0, '#', '$', '%', '&',   0,   0,   0, '*', '+',   0, '-',   0,   0,
+/*   0, '!',   0, '#', '$', '%', '&','\'',   0,   0, '*', '+',   0, '-',   0, '/', */
+  '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',   0,   0,   0, '=',   0, '?',
+  0, 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O',
+  'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',   0,   0,   0, '^', '_',
+  '`', 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o',
+  'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', '{', '|', '}', '~',  0,
+};
+
+#define ATOM(c) (((unsigned int)(*(c)) < 255) && rfc2822_atom[(unsigned int)(*(c))])
+#define DOTTED_ATOM(c) ( ((c[0] == mbw_lit('.')) && ATOM((c+1))) || ATOM(c) )
+#define COLON_ATOM(c) ( ((c[0] == mbw_lit(':')) && ATOM((c+1))) || ATOM(c) )
+#define DOTTED_DIGITS(c) ( ((c[0] == mbw_lit('.')) && mbw_isdigit(c[1])) || mbw_isdigit(c[0]) )
+#define COLON_DIGITS(c) ( ((c[0] == mbw_lit(':')) && mbw_isdigit(c[1])) || mbw_isdigit(c[0]) )
+#define DOTTED_ALPHA(c) ( ((c[0] == mbw_lit('.')) && mbw_isalpha(c[1])) || mbw_isalpha(c[0]) )
+
+
 /* warning: macros and modules work directly with this structure */
 static enum {
   fDEF = 1,
@@ -682,7 +708,8 @@ static enum {
   fALPHA,
   fNUMERIC,
   fSYMBOL,
-  fANSX_1, fANSX_2, fANSX_3
+  fANSX_1, fANSX_2, fANSX_3,
+  fCEF2_ATOM, fCEF2_DOTTED_ATOM, fCEF2_COLON_ATOM
 } char_filter_state = fDEF;
 
 /*
@@ -1194,7 +1221,6 @@ good_char_t mbw_prefix(handle_alpha_number_symbol_case)(const mbw_t *c) {
 }
 
 
-
 /*
  * This is the CEF (common encoding formats) tokenizer. 
  * It was the first attempt at a specialized email tokenizer.
@@ -1314,6 +1340,98 @@ good_char_t mbw_prefix(is_adp_char)(const mbw_t *c) {
   return gcDISCARD;
 }
 
+/*
+ * This is the CEF2 (common email format v2) tokenizer. 
+ */
+
+static __inline__
+good_char_t mbw_prefix(is_cef2_special_case)(const mbw_t *c) {
+  return gcUNDEF;
+}
+
+static __inline__
+good_char_t mbw_prefix(is_cef2_atom_case)(const mbw_t *c) {
+  if( ATOM(c) ) {
+    char_filter_state = fCEF2_ATOM;
+    return gcTOKEN;
+  }
+  return gcUNDEF;
+}
+
+static __inline__
+good_char_t mbw_prefix(handle_cef2_atom_case)(const mbw_t *c) {
+  if( ATOM(c) ) {
+    return gcTOKEN;
+  } else if( DOTTED_ATOM(c) ) {
+    char_filter_state = fCEF2_DOTTED_ATOM;
+    return gcTOKEN;
+  } else if( COLON_ATOM(c) ) {
+    char_filter_state = fCEF2_COLON_ATOM;
+    return gcTOKEN;
+  }
+  char_filter_state = fDEF;
+  return gcDISCARD;
+}
+
+static __inline__
+good_char_t mbw_prefix(handle_cef2_dotted_atom_case)(const mbw_t *c) {
+  if( DOTTED_ATOM(c) ) {
+    return gcTOKEN;
+  }
+  char_filter_state = fDEF;
+  return gcDISCARD;
+}
+
+static __inline__
+good_char_t mbw_prefix(handle_cef2_colon_atom_case)(const mbw_t *c) {
+  if( COLON_ATOM(c) ) {
+    return gcTOKEN;
+  }
+  char_filter_state = fDEF;
+  return gcDISCARD;
+}
+
+static __inline__
+good_char_t mbw_prefix(is_cef2_char)(const mbw_t *c) {
+  good_char_t retval;
+  switch(char_filter_state) {
+  case fDEF:
+#if defined MBW_MB
+    /* this doesn't make sense for wide characters */
+    if(*c & 0x80) {
+      if( (retval = mbw_prefix(is_unicode_case)(c)) || 
+	  (retval = mbw_prefix(is_asian_case)(c)) ) {
+	return retval;
+      } else if( *c < 0xa0 ) {
+	return gcDISCARD;
+      }  
+    }
+#endif
+    if( (retval = mbw_prefix(is_cef2_special_case)(c)) ||
+	(retval = mbw_prefix(is_cef2_atom_case)(c)) ) {
+      return retval;
+    }
+    return gcDISCARD;
+  case fCEF2_ATOM:
+    return mbw_prefix(handle_cef2_atom_case)(c);
+  case fCEF2_DOTTED_ATOM:
+    return mbw_prefix(handle_cef2_dotted_atom_case)(c);
+  case fCEF2_COLON_ATOM:
+    return mbw_prefix(handle_cef2_colon_atom_case)(c);
+  case ASIAN_CASES:
+    return mbw_prefix(handle_asian_case)(c);
+  case UNICODE_CASES:
+    return mbw_prefix(handle_unicode_case)(c);
+  default:
+    /* nothing */
+    break;
+  }
+  char_filter_state = fDEF;
+  return gcDISCARD;
+}
+
+
+
 static __inline__
 good_char_t mbw_prefix(is_char_char)(const mbw_t *c) {
 /*   return (mbw_isgraph(*c) ? gcTOKEN_END :  */
@@ -1338,18 +1456,23 @@ good_char_t mbw_prefix(good_char)(mbw_t *c) {
     if( !(m_options & (1<<M_OPTION_CASEN)) ) {
       *c = mbw_tolower(*c);
     }
-    if( m_options & (1<<M_OPTION_CHAR_ADP) ) {
+    switch(m_cp) {
+    case CP_ADP:
       return mbw_prefix(is_adp_char)(c);
-    } else if( m_options & (1<<M_OPTION_CHAR_CHAR) ) {
+    case CP_CEF2:
+      return mbw_prefix(is_cef2_char)(c);
+    case CP_CHAR:
       return mbw_prefix(is_char_char)(c);
-    } else if( m_options & (1<<M_OPTION_CHAR_ALPHA) ) {
+    case CP_ALPHA:
       return mbw_isalpha(*c) ? gcTOKEN : gcDISCARD;
-    } else if( m_options & (1<<M_OPTION_CHAR_CEF) ) {
+    case CP_CEF:
       return mbw_prefix(is_cef_char)(c);
-    } else if( m_options & (1<<M_OPTION_CHAR_ALNUM) ) {
+    case CP_ALNUM:
       return mbw_isalnum(*c) ? gcTOKEN : gcDISCARD;
-    } else if( m_options & (1<<M_OPTION_CHAR_GRAPH) ) {
+    case CP_GRAPH:
       return mbw_isgraph(*c) ? gcTOKEN : gcDISCARD;
+    case CP_DEFAULT:
+      break;
     }
   }
   return gcDISCARD;
@@ -1400,7 +1523,7 @@ void mbw_prefix(regex_tokenizer)(mbw_t *p, int i,
 
     cq = q;
     *cq++ = CLASSEP;
-    *cq++ = (char)tt.cls;
+    *cq++ = (char)(AMIN + tt.cls);
     *cq = '\0'; 
 
     /* now let each category process the token */
@@ -1495,7 +1618,7 @@ void mbw_prefix(std_tokenizer)(mbw_t *p, char **pq, char *hbuf,
 	  tt = (*get_tt)(1);
 	  cq = q;
 	  *cq++ = CLASSEP;
-	  *cq++ = (char)tt.cls;
+	  *cq++ = (char)(AMIN + tt.cls);
 	  *cq = '\0';
 	  /* let each category process the token */
 	  (*word_fun)(hbuf, tt, INVALID_RE); 
@@ -1516,7 +1639,7 @@ void mbw_prefix(std_tokenizer)(mbw_t *p, char **pq, char *hbuf,
 
 	  cq = q;
 	  *cq++ = CLASSEP;
-	  *cq++ = (char)tt.cls;
+	  *cq++ = (char)(AMIN + tt.cls);
 	  *cq = '\0';
 		
 	  qq = hbuf;
@@ -1614,24 +1737,24 @@ bool_t mbw_prefix(mhe_line_filter)(mbw_t *line) {
 }
 
 int mbw_prefix(extract_header_label)(MBOX_State *mbox, mbw_t *line) {
-/*   mbw_t *p = line; */
+  mbw_t *p = line;
 
   if( m_options & (1<<M_OPTION_XHEADERS) ) {
-/*     if( (mbw_strncasecmp(p, mbw_lit("X-DBACL"),7) == 0) || */
-/* 	(mbw_strncasecmp(p, mbw_lit("Date:"),4) == 0) || */
-/* 	(mbw_strncasecmp(p, mbw_lit("Path:"),4) == 0) || */
-/* 	(mbw_strncasecmp(p, mbw_lit("Posted:"),6) == 0) || */
-/* 	(mbw_strncasecmp(p, mbw_lit("Expires:"),7) == 0) || */
-/* 	(mbw_strncasecmp(p, mbw_lit("Received:"),8) == 0) || */
-/* 	(mbw_strncasecmp(p, mbw_lit("Resent-Date:"),11) == 0) || */
-/* 	(mbw_strncasecmp(p, mbw_lit("Delivery-Date:"),13) == 0) || */
-/* 	(mbw_isspace(line[0]) && mbox->skip_header) ) { */
-/*       mbox->skip_header = 1; */
-/*       return 0; */
-/*     } else { */
+    if( (mbw_strncasecmp(p, mbw_lit("X-DBACL"),7) == 0) ||
+	(mbw_strncasecmp(p, mbw_lit("Date:"),4) == 0) ||
+	(mbw_strncasecmp(p, mbw_lit("Path:"),4) == 0) ||
+	(mbw_strncasecmp(p, mbw_lit("Posted:"),6) == 0) ||
+	(mbw_strncasecmp(p, mbw_lit("Expires:"),7) == 0) ||
+	(mbw_strncasecmp(p, mbw_lit("Received:"),8) == 0) ||
+	(mbw_strncasecmp(p, mbw_lit("Resent-Date:"),11) == 0) ||
+	(mbw_strncasecmp(p, mbw_lit("Delivery-Date:"),13) == 0) ||
+	(mbw_isspace(line[0]) && mbox->skip_header) ) {
+      mbox->skip_header = 1;
+      return 0;
+    } else {
       mbox->skip_header = 0;
       return mbw_prefix(mhe_line_filter)(line);
-/*     } */
+    }
   }
 
   return 0;
@@ -1874,40 +1997,129 @@ void mbw_prefix(strip_from_char)(MBOX_State *mbox, mbw_t *q) {
   }
 }
 
+static
+Mheaderid mbw_prefix(identify_header)(mbw_t *line) {
+#define HDRID(s,l,h) !mbw_strncasecmp(line, s,l) ? h
+  if( mbw_isspace(*line) ) { 
+    return hidCONTINUATION; 
+  }
+  switch(mbw_tolower(line[0])) {
+  case mbw_lit('b'):
+    return
+      HDRID(mbw_lit("BCC:"),4,hidBCC) :
+      hidUNDEF;
+  case mbw_lit('c'):
+    return
+      HDRID(mbw_lit("Content-"),8,hidCONTENT_) :
+      HDRID(mbw_lit("CC:"),3,hidCC) :
+      HDRID(mbw_lit("Categor"),7,hidCATEGORY) :
+      HDRID(mbw_lit("Comments:"),9,hidCOMMENTS) :
+      hidUNDEF;
+  case mbw_lit('f'):
+    return
+      HDRID(mbw_lit("From:"),5,hidFROM) :
+      hidUNDEF;
+  case mbw_lit('i'):
+    return
+      HDRID(mbw_lit("In-Reply-To:"),12,hidIN_REPLY_TO) :
+      HDRID(mbw_lit("Importance:"),11,hidIMPORTANCE) :
+      hidUNDEF;
+  case mbw_lit('k'):
+    return
+      HDRID(mbw_lit("Keywords:"),9,hidKEYWORDS) :
+      hidUNDEF;
+  case mbw_lit('l'):
+    return
+      HDRID(mbw_lit("List-"),5,hidLIST_) :
+      hidUNDEF;
+  case mbw_lit('m'):
+    return
+      HDRID(mbw_lit("Message-ID:"),11,hidMESSAGE_ID) :
+      HDRID(mbw_lit("MIME-Version:"),13,hidMIME_VERSION) :
+      hidUNDEF;
+  case mbw_lit('n'):
+    return
+      HDRID(mbw_lit("Notes:"),6,hidNOTE) :
+      hidUNDEF;
+  case mbw_lit('o'):
+    return
+      HDRID(mbw_lit("Original-"),8,hidORIGINAL_) :
+      hidUNDEF;
+  case mbw_lit('p'):
+    return 
+      HDRID(mbw_lit("Priority:"),9,hidPRIORITY) :
+      hidUNDEF;
+  case mbw_lit('r'):
+    return 
+      HDRID(mbw_lit("Received:"),9,hidRECEIVED) : 
+      HDRID(mbw_lit("Return-Path:"),12,hidRETURN_PATH) :
+      HDRID(mbw_lit("References:"),11,hidREFERENCES) :
+      HDRID(mbw_lit("Return-Receipt-To:"),18,hidRETURN_RECEIPT_TO) :
+      HDRID(mbw_lit("Reply-To:"),9,hidREPLY_TO) :
+      HDRID(mbw_lit("Resent-"),7,hidRESENT_) :
+      hidUNDEF;
+  case mbw_lit('s'):
+    return
+      HDRID(mbw_lit("Subject:"),8,hidSUBJECT) :
+      HDRID(mbw_lit("Sent:"),5,hidSENT) :
+      HDRID(mbw_lit("Sender:"),7,hidSENDER) :
+      hidUNDEF;
+  case mbw_lit('t'):
+    return
+      HDRID(mbw_lit("To:"),3,hidTO) :
+      HDRID(mbw_lit("Thread-"),7,hidTHREAD_) :
+      hidUNDEF;
+  case mbw_lit('x'):
+    return
+      HDRID(mbw_lit("X-MS"),4,hidX_MS) :
+      HDRID(mbw_lit("X-"),2,hidX_) :
+      hidUNDEF;
+  case mbw_lit('u'):
+    return
+      HDRID(mbw_lit("User-Agent:"),11,hidUSER_AGENT) :
+      hidUNDEF;
+  }
+  return hidUNDEF;
+}
+
 
 static
 HEADER_Type mbw_prefix(scan_header_type)(MBOX_State *mbox, mbw_t *line) {
 
 #define STRIP(q) {while(*q++) { if( *q == mbw_lit(';') ) { *q++ = mbw_lit('\n'); *q = mbw_lit('\0'); break; }}}
+#define HDRIDCHK(x,y) ((mbox->hid == x) && (mbox->hstate = y))
+  Mheaderid hid = mbw_prefix(identify_header)(line);
 
-#define HDRCHK(s,l,h) (!mbw_strncasecmp(line, s,l) && (mbox->hstate = h))
-
-  if( mbw_isspace(*line) ) {
+  if( hid == hidCONTINUATION ) {
+    /* we don't update mbox->hid */
     mbw_prefix(strip_from_char)(mbox, line);
     return htCONT;
-  } else if( HDRCHK(mbw_lit("From:"),5,mhsFROM) || 
-	     HDRCHK(mbw_lit("To:"),3,mhsTO) ||
-	     HDRCHK(mbw_lit("Message-ID:"),11,mhsUNDEF) ||
-	     HDRCHK(mbw_lit("In-Reply-To:"),12,mhsUNDEF) ||
-	     HDRCHK(mbw_lit("Subject:"),8,mhsSUBJECT) ) {
+  } 
+
+  mbox->hid = hid;
+  if( HDRIDCHK(hidFROM,mhsFROM) ||
+      HDRIDCHK(hidTO,mhsTO) ||
+      HDRIDCHK(hidMESSAGE_ID,mhsUNDEF) ||
+      HDRIDCHK(hidIN_REPLY_TO,mhsUNDEF) ||
+      HDRIDCHK(hidSUBJECT,mhsSUBJECT) ) {
     mbox->mbw_prefix(strip_header_char) = mbw_lit('\0');
     mbw_prefix(strip_from_char)(mbox, line);
     return htSTANDARD;
-  } else if( HDRCHK(mbw_lit("Return-Path:"),12,mhsTRACE) || 
-	     HDRCHK(mbw_lit("Received:"),9,mhsTRACE) ) {
+  } else if( HDRIDCHK(hidRETURN_PATH,mhsTRACE) || 
+	     HDRIDCHK(hidRECEIVED,mhsTRACE) ) {
     mbox->mbw_prefix(strip_header_char) = mbw_lit(';');
     mbw_prefix(strip_from_char)(mbox, line);
     return htTRACE;
-  } else if( !mbw_strncasecmp(line, mbw_lit("Content-"),8) &&
+  } else if( (mbox->hid == hidCONTENT_) &&
 	     mbw_strchr(line + 8, mbw_lit(':')) ) {
     mbox->hstate = mhsMIME;
     mbox->mbw_prefix(strip_header_char) = mbw_lit('\0');
     return htMIME;
-  } else if( HDRCHK(mbw_lit("Sender:"),7,mhsUNDEF) ||
-	     HDRCHK(mbw_lit("Reply-To:"),9,mhsUNDEF) ||
-	     HDRCHK(mbw_lit("Bcc:"),4,mhsUNDEF) ||
-	     HDRCHK(mbw_lit("Cc:"),3,mhsUNDEF) ||
-	     HDRCHK(mbw_lit("References:"),11,mhsUNDEF) ) {
+  } else if( HDRIDCHK(hidSENDER,mhsUNDEF) ||
+	     HDRIDCHK(hidREPLY_TO,mhsUNDEF) ||
+	     HDRIDCHK(hidBCC,mhsUNDEF) ||
+	     HDRIDCHK(hidCC,mhsUNDEF) ||
+	     HDRIDCHK(hidREFERENCES,mhsUNDEF) ) {
     mbox->mbw_prefix(strip_header_char) = mbw_lit('\0');
     mbw_prefix(strip_from_char)(mbox, line);
     return htEXTENDED;
@@ -1924,6 +2136,58 @@ HEADER_Type mbw_prefix(scan_header_type)(MBOX_State *mbox, mbw_t *line) {
     }
   }
 }
+
+/* static */
+/* HEADER_Type mbw_prefix(scan_header_type)(MBOX_State *mbox, mbw_t *line) { */
+
+/* #define STRIP(q) {while(*q++) { if( *q == mbw_lit(';') ) { *q++ = mbw_lit('\n'); *q = mbw_lit('\0'); break; }}} */
+
+/* #define HDRCHK(s,l,h) (!mbw_strncasecmp(line, s,l) && (mbox->hstate = h)) */
+
+/*   mbox->mm = mbw_prefix(identify_header)(line); */
+
+/*   if( mbw_isspace(*line) ) { */
+/*     mbw_prefix(strip_from_char)(mbox, line); */
+/*     return htCONT; */
+/*   } else if( HDRCHK(mbw_lit("From:"),5,mhsFROM) ||  */
+/* 	     HDRCHK(mbw_lit("To:"),3,mhsTO) || */
+/* 	     HDRCHK(mbw_lit("Message-ID:"),11,mhsUNDEF) || */
+/* 	     HDRCHK(mbw_lit("In-Reply-To:"),12,mhsUNDEF) || */
+/* 	     HDRCHK(mbw_lit("Subject:"),8,mhsSUBJECT) ) { */
+/*     mbox->mbw_prefix(strip_header_char) = mbw_lit('\0'); */
+/*     mbw_prefix(strip_from_char)(mbox, line); */
+/*     return htSTANDARD; */
+/*   } else if( HDRCHK(mbw_lit("Return-Path:"),12,mhsTRACE) ||  */
+/* 	     HDRCHK(mbw_lit("Received:"),9,mhsTRACE) ) { */
+/*     mbox->mbw_prefix(strip_header_char) = mbw_lit(';'); */
+/*     mbw_prefix(strip_from_char)(mbox, line); */
+/*     return htTRACE; */
+/*   } else if( !mbw_strncasecmp(line, mbw_lit("Content-"),8) && */
+/* 	     mbw_strchr(line + 8, mbw_lit(':')) ) { */
+/*     mbox->hstate = mhsMIME; */
+/*     mbox->mbw_prefix(strip_header_char) = mbw_lit('\0'); */
+/*     return htMIME; */
+/*   } else if( HDRCHK(mbw_lit("Sender:"),7,mhsUNDEF) || */
+/* 	     HDRCHK(mbw_lit("Reply-To:"),9,mhsUNDEF) || */
+/* 	     HDRCHK(mbw_lit("Bcc:"),4,mhsUNDEF) || */
+/* 	     HDRCHK(mbw_lit("Cc:"),3,mhsUNDEF) || */
+/* 	     HDRCHK(mbw_lit("References:"),11,mhsUNDEF) ) { */
+/*     mbox->mbw_prefix(strip_header_char) = mbw_lit('\0'); */
+/*     mbw_prefix(strip_from_char)(mbox, line); */
+/*     return htEXTENDED; */
+/*   } else { */
+/*     /\* if the line starts with a word missing a :, then  */
+/*        it could be a malformed continuation line *\/ */
+/*     while( *line && !mbw_isspace(*line) && (*line != mbw_lit(':')) ) { line++; } */
+/*     if( *line == mbw_lit(':') ) { */
+/*       mbox->hstate = mhsUNDEF; */
+/*       mbox->mbw_prefix(strip_header_char) = mbw_lit('\0'); */
+/*       return htUNDEF; */
+/*     } else { */
+/*       return htCONT; */
+/*     } */
+/*   } */
+/* } */
 
 static
 int mbw_prefix(extract_mime_label)(mbw_t *line) {
@@ -1979,6 +2243,7 @@ bool_t mbw_prefix(mbox_line_filter)(MBOX_State *mbox, mbw_t *line,
     if( !line_empty ) {
       mbox->state = msHEADER;
       mbox->substate = msuUNDEF;
+      mbox->hid = hidUNDEF;
       mbox->hstate = mhsUNDEF;
       mbox->armor = maUNDEF;
       mbox->skip_until_boundary = 0;
@@ -1988,6 +2253,7 @@ bool_t mbw_prefix(mbox_line_filter)(MBOX_State *mbox, mbw_t *line,
     if( line_empty ) {
       mbox->state = msBODY;
       mbox->substate = msuUNDEF;
+      mbox->hid = hidUNDEF;
       mbox->hstate = mhsUNDEF;
       mbox->armor = maUNDEF;
       /* don't reset skip_until_boundary */
@@ -1998,6 +2264,7 @@ bool_t mbw_prefix(mbox_line_filter)(MBOX_State *mbox, mbw_t *line,
     if( doubledash && mbw_prefix(check_mime_boundary)(mbox, line) ) {
       mbox->state = msATTACH;
       mbox->substate = msuUNDEF;
+      mbox->hid = hidUNDEF;
       mbox->hstate = mhsUNDEF;
       mbox->armor = maUNDEF;
       mbox->skip_until_boundary = mbox->boundary.was_end;
@@ -2007,6 +2274,7 @@ bool_t mbw_prefix(mbox_line_filter)(MBOX_State *mbox, mbw_t *line,
 	       mbw_prefix(check_old_style_digest)(line) ) {
       mbox->state = msATTACH;
       mbox->substate = msuTRACK;
+      mbox->hid = hidUNDEF;
       mbox->hstate = mhsUNDEF;
       mbox->armor = maUNDEF;
       mbox->skip_until_boundary = mbox->boundary.was_end;
@@ -2019,6 +2287,7 @@ bool_t mbw_prefix(mbox_line_filter)(MBOX_State *mbox, mbw_t *line,
 	       (mbox->substate == msuARMOR) &&
 	       mbw_prefix(check_armor_end)(line) ) {
       mbox->substate = msuTRACK;
+      mbox->hid = hidUNDEF;
       mbox->hstate = mhsUNDEF;
       mbox->armor = maUNDEF;
       mbox->skip_until_boundary = mbox->boundary.was_end;
@@ -2051,6 +2320,7 @@ bool_t mbw_prefix(mbox_line_filter)(MBOX_State *mbox, mbw_t *line,
 	}
       } else if( !mbw_strncmp(line, mbw_lit("From "), 5) ) {
 	mbox->state = msHEADER;
+	mbox->hid = hidUNDEF;
 	mbox->substate = msuUNDEF;
 	mbox->hstate = mhsUNDEF;
 	mbox->armor = maUNDEF;
@@ -2096,6 +2366,7 @@ bool_t mbw_prefix(mbox_line_filter)(MBOX_State *mbox, mbw_t *line,
 	break;
       }
       mbox->substate = msuUNDEF;
+      mbox->hid = hidUNDEF;
       mbox->hstate = mhsUNDEF;
       mbox->armor = maUNDEF;
       mbox->skip_until_boundary = 0;

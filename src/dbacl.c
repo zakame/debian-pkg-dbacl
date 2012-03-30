@@ -3,7 +3,7 @@
  *  
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
+ * the Free Software Foundation; either version 3 of the License, or
  * (at your option) any later version.
  * 
  * This program is distributed in the hope that it will be useful,
@@ -13,7 +13,7 @@
  * 
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA.
  * 
  * Author:   Laird Breyer <laird@lbreyer.com>
  */
@@ -70,7 +70,7 @@ extern hash_bit_count_t default_max_grow_hash_bits;
 extern hash_count_t default_max_grow_tokens;
 
 hash_bit_count_t decimation;
-token_count_t ftreshold = 0;
+int zthreshold = 0;
 
 learner_t learner;
 dirichlet_t dirichlet;
@@ -87,6 +87,8 @@ extern empirical_t empirical;
 
 extern options_t u_options;
 extern options_t m_options;
+extern charparser_t m_cp;
+extern digtype_t m_dt;
 extern char *extn;
 
 extern token_order_t ngram_order; /* defaults to 1 */
@@ -101,7 +103,10 @@ extern char *optarg;
 extern int optind, opterr, optopt;
 
 char *title = "";
+char *digtype = "";
 char *online = "";
+char *ronline[MAX_CAT];
+category_count_t ronline_count = 0;
 extern char *progname;
 extern char *inputfile;
 extern long inputline;
@@ -174,6 +179,71 @@ static void usage(/*@unused@*/ char **argv) {
  * CATEGORY FUNCTIONS                                      *
  ***********************************************************/
 
+void reset_all_scores() {
+  category_count_t i;
+  for(i = 0; i < cat_count; i++) {
+    cat[i].score = 0.0;
+    cat[i].score_s2 = 0.0;
+    cat[i].score_div = 0.0;
+    cat[i].score_shannon = 0.0;
+    cat[i].complexity = 0.0;
+    cat[i].fcomplexity = 0;
+  }
+}
+
+/* calculate the overlap probabilities (ie the probability that the
+   given score is the minimal score assuming independent Gaussian
+   distributions.)
+
+   NOTE: I also toyed with the idea of multiplying each uncertainty
+   score by the percentage of recognized tokens for that category.  It
+   seems plausible that uncertainty should also be proportional to the
+   unknown token count, but in practice, a typical email has a
+   substantial fraction of unknown tokens, and this dominates the
+   uncertainty obtained from the Gaussian assumption.  I've disabled
+   this code again, see ALTERNATIVE UNCERTAINTY code below 
+*/
+double calc_uncertainty(int map) {
+  double mu[MAX_CAT];
+  double sigma[MAX_CAT];
+  int i;
+  double p, u, t, pmax;
+
+  for(i = 0; i < cat_count; i++) {
+    mu[i] = -sample_mean(cat[i].score, cat[i].complexity);
+    sigma[i] = sqrt(cat[i].score_s2/cat[i].complexity);
+  }
+
+  /* even though p below is a true probability, it doesn't quite sum
+     to 1, because of numerical errors in the min_prob function, which
+     is only designed to do about 1% error for speed. 
+     So we might get up to 1 + cat_count% total mass, 
+     which means that u could be 102% say in spam filtering. 
+     Doesn't look good. So we compute the normalizing constant t.
+  */
+  t = 0.0;
+  pmax = 1.0;
+  for(i = 0; i < cat_count; i++) {
+    p = min_prob(i, cat_count, mu, sigma);
+    if( i == map ) {
+      pmax = p;
+    }
+    t += p;
+  }
+
+  /* pmax is proportional to the MAP probability, which is guaranteed
+     to be >= 0.5.  The value 0.5 occurs when the MAP is totally ambiguous,
+  ie the classification is completely uncertain. Since people prefer a range
+  0-100%, we stretch the MAP probability into the interval [0,1] here. */
+  u = 2.0 * pmax / t - 1.0; 
+
+
+  /* ALTERNATIVE UNCERTAINTY : uncomment below to enable */
+  /* now multiply by the feature hit rate, which is also in [0,1] */
+  /* u *= ((cat[map].complexity - cat[map].fmiss) / cat[map].complexity); */
+
+  return u;
+}
 
 /* note: don't forget to flush after each line */
 void line_score_categories(char *textbuf) {
@@ -192,9 +262,8 @@ void line_score_categories(char *textbuf) {
       map = i;
     }
     /* finish sample variance calculation */
-    cat[i].score_s2 = (cat[i].complexity * cat[i].score_s2 -
-		       cat[i].score * cat[i].score)/
-      ((score_t)cat[i].complexity * ((score_t)cat[i].complexity - 1));
+    cat[i].score_s2 = 
+      sample_variance(cat[i].score_s2, cat[i].score, cat[i].complexity);
   }
 
   if( !(u_options & (1<<U_OPTION_DUMP)) ) {
@@ -221,7 +290,7 @@ void line_score_categories(char *textbuf) {
 	  if( u_options & (1<<U_OPTION_VERBOSE) ) {
 	    fprintf(stdout, "%s %6.2" FMT_printf_score_t " * %-4.1f ", 
 		    cat[i].filename, 
-		    -nats2bits(cat[i].score/cat[i].complexity), 
+		    -nats2bits(sample_mean(cat[i].score, cat[i].complexity)), 
 		    cat[i].complexity);
 	  } else {
 	    fprintf(stdout, "%s %6.2" FMT_printf_score_t " ", 
@@ -244,15 +313,8 @@ void line_score_categories(char *textbuf) {
 
   }    
   /* clean up for next line */
-  for(i = 0; i < cat_count; i++) {
-    cat[i].score = 0.0;
-    cat[i].score_s2 = 0.0;
-    cat[i].score_div = 0.0;
-    cat[i].score_shannon = 0.0;
-    cat[i].score_exp = 0.0;
-    cat[i].complexity = 0.0;
-    cat[i].fcomplexity = 0;
-  }
+  reset_all_scores();
+
   if( m_options & (1<<M_OPTION_CALCENTROPY) ) {
     clear_empirical(&empirical);
   }
@@ -260,33 +322,65 @@ void line_score_categories(char *textbuf) {
 
 void score_categories() {
   bool_t no_title;
-  category_count_t i;
-  score_t c, cmax;
+  category_count_t i, j, map;
+  score_t c, cmax, lam;
+  score_t sumdocs, sumfeats;
+  bool_t hasnum;
 
-  /* find MAP */
-  cmax = cat[0].score; 
-  exit_code = 0;
-  for(i = 0; i < cat_count; i++) {
-    if(cmax < cat[i].score) {
-      cmax = cat[i].score;
-      exit_code = (int)i;
-    }
-    /* finish sample variance calculation */
-    cat[i].score_s2 = (cat[i].complexity * cat[i].score_s2 -
-		       cat[i].score * cat[i].score)/
-      ((score_t)cat[i].complexity * ((score_t)cat[i].complexity - 1));
-  }
-
-  /* finish computing entropies */
+  /* finish computing sample entropies */
   if( m_options & (1<<M_OPTION_CALCENTROPY) ) {
     for(i = 0; i < cat_count; i++) {
       cat[i].score_shannon = 
-	-( cat[i].score_shannon / ((weight_t)cat[i].complexity) -
+	-( sample_mean(cat[i].score_shannon, cat[i].complexity) -
 	   log((weight_t)cat[i].complexity) );
       cat[i].score_div = 
-	-(cat[i].score/cat[i].complexity + cat[i].score_shannon);
+	-( sample_mean(cat[i].score, cat[i].complexity) + cat[i].score_shannon);
     }
   }
+
+  hasnum = 1;
+  sumdocs = 0.0;
+  sumfeats = 0.0;
+  for(i = 0; i < cat_count; i++) {
+    /* finish sample variance calculation */
+    cat[i].score_s2 = 
+      sample_variance(cat[i].score_s2, cat[i].score, cat[i].complexity);
+    /* compute some constants */
+    hasnum = hasnum && (cat[i].model_num_docs > 0);
+    sumdocs += cat[i].model_num_docs;
+    sumfeats += cat[i].model_unique_token_count;
+  }
+
+  if( (u_options & (1<<U_OPTION_PRIOR_CORRECTION)) && hasnum ) {
+
+    cmax = log(2.0*M_PI)/2.0;
+    for(i = 0; i < cat_count; i++) {
+      /* the prior is Poisson based on mean document length.
+	 -lambda + x * log(lambda) - log(x!), which using Stirling's
+	 approximation
+	 log(x!) = x*log(x) - x + 0.5*log(2PI*x), 
+	 can be calculated as 
+	 -lambda - 0.5*log(2PI) + x * (1 + log(lambda/x)).
+      */
+      
+      lam = (score_t)cat[i].model_full_token_count/cat[i].model_num_docs;
+      cat[i].prior = 
+	-lam -cmax + cat[i].complexity * (1.0 + log(lam/cat[i].complexity));
+      cat[i].score += cat[i].prior;
+    }
+  }
+
+
+  /* find MAP */
+  cmax = cat[0].score; 
+  map = 0;
+  for(i = 0; i < cat_count; i++) {
+    if(cmax < cat[i].score) {
+      cmax = cat[i].score;
+      map = i;
+    }
+  }
+  exit_code = (int)map;
 
   /* there are three cases: posterior, scores, nothing */
 
@@ -325,13 +419,13 @@ void score_categories() {
 	  fprintf(stdout, "%s ( %5.2" FMT_printf_score_t 
 		  " # %5.2" FMT_printf_score_t " )* %-.1f ", 
 		  cat[i].filename, 
-		  -nats2bits(cat[i].score/cat[i].complexity),
+		  -nats2bits(sample_mean(cat[i].score, cat[i].complexity)),
 		  nats2bits(sqrt(cat[i].score_s2/cat[i].complexity)),
 		  cat[i].complexity);
 	} else {
 	  fprintf(stdout, "%s %5.2" FMT_printf_score_t " * %-.1f ", 
 		  cat[i].filename, 
-		  -nats2bits(cat[i].score/cat[i].complexity),
+		  -nats2bits(sample_mean(cat[i].score, cat[i].complexity)),
 		  cat[i].complexity);
 	}
 	if( u_options & (1<<U_OPTION_CONFIDENCE) ) {
@@ -362,6 +456,25 @@ void score_categories() {
       if( !no_title ) { fprintf(stdout, "\n"); }
     }
 
+  } else if(u_options & (1<<U_OPTION_MEDIACOUNTS) ) {
+    for(i = 0; i < cat_count; i++) {
+      if( (u_options & (1<<U_OPTION_VERBOSE)) ) {
+	fprintf(stdout, "%s ( %5.2" FMT_printf_score_t " M ",
+		cat[i].filename,
+		-nats2bits(sample_mean(cat[i].score, cat[i].complexity)));
+	for(j = 0; j < TOKEN_CLASS_MAX; j++) {
+	  fprintf(stdout, "%4d ", cat[i].mediacounts[j]);
+	}
+	fprintf(stdout, " )* %-.1f ", 
+		cat[i].complexity);
+      } else {
+	fprintf(stdout, "%s\tM ", cat[i].filename);
+	for(j = 0; j < TOKEN_CLASS_MAX; j++) {
+	  fprintf(stdout, "%4d ", cat[i].mediacounts[j]);
+	}
+	fprintf(stdout, "\n");
+      }
+    }
   } else {
 
     if( u_options & (1<<U_OPTION_VERBOSE) ) {
@@ -369,18 +482,22 @@ void score_categories() {
 	  (u_options & (1<<U_OPTION_VAR)) ) {
 	for(i = 0; i < cat_count; i++) {
 	  fprintf(stdout, "%s ( %5.2" FMT_printf_score_t " + "
-		  "%-5.2" FMT_printf_score_t,
+		  "%-5.2" FMT_printf_score_t " ",
 		  cat[i].filename, 
 		  nats2bits(cat[i].score_div),
 		  nats2bits(cat[i].score_shannon));
 	  if( u_options & (1<<U_OPTION_VAR) ) {
-	    fprintf(stdout, " # %5.2" FMT_printf_score_t,
+	    fprintf(stdout, "# %5.2" FMT_printf_score_t " ",
 		    nats2bits(sqrt(cat[i].score_s2/cat[i].complexity)));
 	  }
-	  fprintf(stdout, " )* %-6.1f", cat[i].complexity);
+	  fprintf(stdout, ")* %-6.1f ", cat[i].complexity);
 	  if( u_options & (1<<U_OPTION_CONFIDENCE) ) {
-	    fprintf(stdout, " @ %5.1f%% ", 
+	    fprintf(stdout, "@ %5.1f%% ", 
 		    (float)gamma_pvalue(&cat[i], cat[i].score_div)/10);
+	  } else {
+	    /* percentage of tokens which were recognized */
+	    fprintf(stdout, "H %.f%% ",
+		    (100.0 * (1.0 - cat[i].fmiss/((score_t)cat[i].fcomplexity))));
 	  }
 	}
 	fprintf(stdout, "\n");
@@ -396,28 +513,30 @@ void score_categories() {
 	  fprintf(stdout, "\n# category ");
 	}
 
-	cmax = 1.0;
-	for(i = 0; i < cat_count; i++) {
-	  if( (int)i != exit_code ) {
-	    /* c is a standard normal variable */
-	    c = (-cat[i].score/cat[i].complexity - 
-		 -cat[exit_code].score/cat[exit_code].complexity) /
-	      sqrt(cat[i].score_s2/cat[i].complexity + 
-		   cat[exit_code].score_s2/cat[exit_code].complexity);
-	    /* c will always be positive, but let's be safe */
-	    if( isnan(c) ) {
-	      c = 0.0;
-	    } else if( c > 5.0 ) {
-	      c = 1.0;
-	    } else if( c < -5.0 ) {
-	      c = 0.0;
-	    } else {
-	      /* normal_cdf(c) has a range of 0.5 - 1.0, we convert to a full range */
-	      c = 2 * normal_cdf(c) - 1.0;
-	    }
-	    cmax = (cmax > c) ? c : cmax; 
-	  }
-	}
+	cmax = calc_uncertainty(exit_code);
+
+/* 	cmax = 1.0; */
+/* 	for(i = 0; i < cat_count; i++) { */
+/* 	  if( (int)i != exit_code ) { */
+/* 	    /\* c is a standard normal variable *\/ */
+/* 	    c = (-sample_mean(cat[i].score, cat[i].complexity) -  */
+/* 		 -sample_mean(cat[exit_code].score, cat[exit_code].complexity)) / */
+/* 	      sqrt(cat[i].score_s2/cat[i].complexity +  */
+/* 		   cat[exit_code].score_s2/cat[exit_code].complexity); */
+/* 	    /\* c will always be positive, but let's be safe *\/ */
+/* 	    if( isnan(c) ) { */
+/* 	      c = 0.0; */
+/* 	    } else if( c > 5.0 ) { */
+/* 	      c = 1.0; */
+/* 	    } else if( c < -5.0 ) { */
+/* 	      c = 0.0; */
+/* 	    } else { */
+/* 	      /\* normal_cdf(c) has a range of 0.5 - 1.0, we convert to a full range *\/ */
+/* 	      c = 2 * normal_cdf(c) - 1.0; */
+/* 	    } */
+/* 	    cmax = (cmax > c) ? c : cmax;  */
+/* 	  } */
+/* 	} */
 	fprintf(stdout, "%s # %d%%\n", 
 		cat[exit_code].filename, (int)ceil(cmax * 100.0)); 
       }
@@ -426,6 +545,16 @@ void score_categories() {
   }
 
   exit_code++; /* make number between 1 and cat_count+1 */
+}
+
+void file_score_categories(char *name) {
+  fprintf(stdout, "%s ", name);
+  score_categories();
+  /* clean up for next file */
+  reset_all_scores();
+  if( m_options & (1<<M_OPTION_CALCENTROPY) ) {
+    clear_empirical(&empirical);
+  }
 }
 
 /***********************************************************
@@ -460,6 +589,8 @@ bool_t check_magic_write(char *path, char *magic, size_t len) {
    2) the tmplate is appended with a pattern .tmp.xx,
    3) if you want a particular directory, prepend it to tmplate.
    4) file is opened for read/write, but truncated to zero.
+   5) The limit of 100 tempfiles is hardcoded. If dbacl needs more than
+      that then it's either a bug with dbacl or something wrong on your FS.
 */
 /*@null@*/ 
 FILE *mytmpfile(const char *tmplate, /*@out@*/ char **tmpname) {
@@ -504,6 +635,16 @@ bool_t myrename(const char *src, const char *dest) {
 #endif
 }
 
+/* output -log (mediaprobs) */
+void write_mediaprobs(FILE *out, learner_t *learner) {
+  token_class_t t;
+
+  fprintf(out, MAGIC11);
+  for(t = 0; t < TOKEN_CLASS_MAX; t++) {
+    fprintf(out, "%" FMT_printf_score_t " ", -log(learner->mediaprobs[t]));
+  }
+  fprintf(out, "\n");
+}
 
 bool_t write_category_headers(learner_t *learner, FILE *output) {
   regex_count_t c;
@@ -532,9 +673,14 @@ bool_t write_category_headers(learner_t *learner, FILE *output) {
 
   ok = ok &&
     (0 < fprintf(output, MAGIC8_o,
-		 learner->shannon, 
+		 learner->shannon, learner->shannon2));
+
+  ok = ok &&
+    (0 < fprintf(output, MAGIC10_o,
 		 learner->alpha, learner->beta,
 		 learner->mu, learner->s2));
+
+  write_mediaprobs(output, learner);
 
   /* print out any regexes we might need */
   for(c = 0; c < regex_count; c++) {
@@ -553,8 +699,8 @@ bool_t write_category_headers(learner_t *learner, FILE *output) {
 
   /* print options */
   ok = ok &&
-    (0 < fprintf(output, MAGIC4_o, m_options, 
-		 print_model_options(m_options, scratchbuf)));
+    (0 < fprintf(output, MAGIC4_o, m_options, m_cp, m_dt,
+		 print_model_options(m_options, m_cp, scratchbuf)));
 
   ok = ok &&
     (0 < fprintf(output, MAGIC6)); 
@@ -562,9 +708,9 @@ bool_t write_category_headers(learner_t *learner, FILE *output) {
 }
 
 #if defined DIGITIZE_DIGRAMS
-  typedef digitized_weight_t myweight_t;
+typedef digitized_weight_t myweight_t;
 #else
-  typedef weight_t myweight_t;
+typedef weight_t myweight_t;
 #endif
 
 /* writes the learner to a file for easily readable category */
@@ -572,7 +718,7 @@ bool_t write_category_headers(learner_t *learner, FILE *output) {
    then renamed if no problems occured. Because renames are 
    atomic on POSIX, this guarantees that a loaded category file
    used for classifications is never internally corrupt */
-error_code_t save_learner(learner_t *learner) {
+error_code_t save_learner(learner_t *learner, char *opath) {
 
   alphabet_size_t i, j;
   hash_count_t t;
@@ -606,7 +752,7 @@ error_code_t save_learner(learner_t *learner) {
      user knows that a single process must read/write the file at a time.
      Also, we don't try to create the file - if the file doesn't exist,
      we won't gain much time by using mmap on that single occasion. */
-  if( *online && (u_options & (1<<U_OPTION_MMAP)) ) {
+  if( opath && *opath && (u_options & (1<<U_OPTION_MMAP)) ) {
     ok = (bool_t)0; 
     output = fopen(learner->filename, "r+b");
     if( output ) {
@@ -634,7 +780,7 @@ error_code_t save_learner(learner_t *learner) {
       }
 
       mmap_start = (byte_t *)MMAP(0, mmap_length, 
-			PROT_READ|PROT_WRITE, MAP_SHARED, fileno(output), 0);
+				  PROT_READ|PROT_WRITE, MAP_SHARED, fileno(output), 0);
       if( mmap_start == MAP_FAILED ) { mmap_start = NULL; }
       if( !mmap_start ) { 
 	ok = 0; 
@@ -785,7 +931,7 @@ error_code_t fast_partial_save_learner(learner_t *learner, category_t *xcat) {
   myweight_t *shval_ptr;
 
   if( xcat->mmap_start && 
-      (xcat->m_options == learner->m_options) &&
+      (xcat->model.options == learner->model.options) &&
       (xcat->max_order == learner->max_order) &&
       (xcat->max_hash_bits == learner->max_hash_bits) ) {
     max = 0;
@@ -812,7 +958,12 @@ error_code_t fast_partial_save_learner(learner_t *learner, category_t *xcat) {
     q = strchr(q + 1, '#');
     if( q && (max < REPLBUF) ) {
       n = snprintf(buf + max, (size_t)(REPLBUF - max), MAGIC8_o, 
-		   learner->shannon, 
+		   learner->shannon, learner->shannon2);
+      max += n;
+    }
+    q = strchr(q + 1, '#');
+    if( q && (max < REPLBUF) ) {
+      n = snprintf(buf + max, (size_t)(REPLBUF - max), MAGIC10_o, 
 		   learner->alpha, learner->beta,
 		   learner->mu, learner->s2);
       max += n;
@@ -821,8 +972,8 @@ error_code_t fast_partial_save_learner(learner_t *learner, category_t *xcat) {
     q = strchr(q + 1, '#');
     if( (q - p) == max ) {
       /* from here on, there's no turning back. Since we don't
-        overwrite everything, if there's a problem, we'll have to
-        unlink the category */
+	 overwrite everything, if there's a problem, we'll have to
+	 unlink the category */
 
       /* header */
       memcpy(p, buf, (size_t)max);
@@ -901,7 +1052,7 @@ size_t tmp_read_block(learner_t *learner, byte_t *buf, size_t bufsiz,
   long left = learner->tmp.used - tmp_get_pos(learner);
   if( bufsiz > (size_t)left ) { bufsiz = (left >= 0) ? (size_t)left : 0; }
   if( learner->tmp.mmap_start ) {
-/*     memcpy(buf, learner->tmp.mmap_start + learner->tmp.mmap_cursor, bufsiz); */
+    /*     memcpy(buf, learner->tmp.mmap_start + learner->tmp.mmap_cursor, bufsiz); */
     *startp = learner->tmp.mmap_start + learner->tmp.mmap_cursor;
     learner->tmp.mmap_cursor += bufsiz;
     return bufsiz;
@@ -1101,7 +1252,7 @@ void free_learner_hash(learner_t *learner) {
   }
 }
 
-bool_t create_learner_hash(learner_t *learner, FILE *input) {
+bool_t create_learner_hash(learner_t *learner, FILE *input, bool_t readonly) {
   size_t j, n;
   byte_t *mmap_start;
   long mmap_learner_offset;
@@ -1121,7 +1272,8 @@ bool_t create_learner_hash(learner_t *learner, FILE *input) {
 
     mmap_start =
       (byte_t *)MMAP(0, mmap_hash_offset,
-		     PROT_READ|PROT_WRITE, MAP_SHARED, fileno(input), 0);
+		     PROT_READ|(readonly ? 0 : PROT_WRITE),
+		     MAP_SHARED, fileno(input), 0);
     if( mmap_start == MAP_FAILED ) { mmap_start = NULL; }
     if( mmap_start ) {
       /* first we overwrite the learner struct with the contents of
@@ -1133,7 +1285,8 @@ bool_t create_learner_hash(learner_t *learner, FILE *input) {
       mmap_start =
 	(byte_t *)MMAP(mmap_start,
 		       mmap_hash_offset + sizeof(l_item_t) * learner->max_tokens,
-		       PROT_READ|PROT_WRITE, MAP_SHARED, fileno(input), 0);
+		       PROT_READ|(readonly ? 0 : PROT_WRITE), 
+		       MAP_SHARED, fileno(input), 0);
       if( mmap_start == MAP_FAILED ) { mmap_start = NULL; }
       if( mmap_start ) {
 	/* now fill some member variables */
@@ -1316,24 +1469,25 @@ bool_t grow_learner_hash(learner_t *learner) {
 }
 
 /* This code malloc()s and fread()s the learner structure. */
-bool_t read_online_learner_struct(learner_t *learner, char *path) {
+bool_t read_online_learner_struct(learner_t *learner, char *path, bool_t readonly) {
   FILE *input;
   char buf[BUFSIZ+1]; /* must be greater than MAGIC_BUFSIZE */
   bool_t ok = 0;
   char *sav_filename;
   long offset;
+  l_item_t *p, *e;
 
   /* 
    * This code malloc()s and fread()s the learner structure, or alternatively
    * it mmap()s it for speed. Note we open for read/write, because the
    * file might be left open and reused later.
    */
-  input = fopen(path, "r+b");
+  input = fopen(path, readonly ? "rb" : "r+b");
   if( input ) {
 
-    if( out_iobuf ) {
-      setvbuf(input, (char *)out_iobuf, (int)_IOFBF, (size_t)(BUFFER_MAG * system_pagesize));
-    }
+/*     if( out_iobuf ) { */
+/*       setvbuf(input, (char *)out_iobuf, (int)_IOFBF, (size_t)(BUFFER_MAG * system_pagesize)); */
+/*     } */
 
     if( !fgets(buf, MAGIC_BUFSIZE, input) ||
 	(strncmp(buf, MAGIC_ONLINE, strlen(MAGIC_ONLINE)) != 0) ) {
@@ -1353,7 +1507,7 @@ bool_t read_online_learner_struct(learner_t *learner, char *path) {
       /* must save some prefilled members because learner is read from disk */
       sav_filename = learner->filename;
 
-      if( !create_learner_hash(learner, input) ) {
+      if( !create_learner_hash(learner, input, readonly) ) {
 	ok = 0;
 	goto skip_read_online;
       }
@@ -1361,15 +1515,21 @@ bool_t read_online_learner_struct(learner_t *learner, char *path) {
       learner->filename = sav_filename;
 
       /* override options */
-      if( m_options != learner->m_options ) {
+      if( (m_options != learner->model.options) ||
+	  (zthreshold != learner->model.tmin) ||
+	  (m_cp != learner->model.cp) ||
+	  (m_dt != learner->model.dt) ) {
 	/* we don't warn about changes in u_options, as they can happen
 	   during computations */
 	errormsg(E_WARNING, 
 		 "some command line options were changed when loading %s\n",
 		 path);
+	m_options = learner->model.options;
+	m_cp = learner->model.cp;
+	m_dt = learner->model.dt;
+/*       u_options = learner->u_options; */
+	zthreshold = learner->model.tmin;
       }
-      m_options = learner->m_options;
-      u_options = learner->u_options;
 
       /* last, there is a long list of token strings, we compute the
        start offset, and seek to the end so we can append more
@@ -1387,7 +1547,7 @@ bool_t read_online_learner_struct(learner_t *learner, char *path) {
 	learner->tmp.mmap_length = learner->tmp.avail + system_pagesize;
 	learner->tmp.mmap_start = 
 	  (byte_t *)MMAP(0, learner->tmp.mmap_length,
-			 PROT_READ|PROT_WRITE, MAP_SHARED,
+			 PROT_READ|(readonly ? 0 : PROT_WRITE), MAP_SHARED,
 			 fileno(learner->tmp.file), offset);
 	if( learner->tmp.mmap_start == MAP_FAILED ) { learner->tmp.mmap_start = NULL; }
 	if( learner->tmp.mmap_start ) {
@@ -1419,6 +1579,16 @@ bool_t read_online_learner_struct(learner_t *learner, char *path) {
       }
 /*       printf("tmp.used = %ld tmp.avail = %ld tmp.offset = %ld\n", */
 /* 	     learner->tmp.used, learner->tmp.avail, learner->tmp.offset); */
+     
+      /* last but not least, hash may contain junk because mmapped, so
+	 clear some data */
+      e = learner->hash + learner->max_tokens;
+      for(p = learner->hash; p < e; p++) {
+	if( FILLEDP(p) ) {
+	  p->tmp.read.eff = 0;
+	}
+      }
+
     }
   skip_read_online:
     /* if we're ok, we must leave the file open, even if it's mmapped,
@@ -1462,6 +1632,7 @@ void write_online_learner_struct(learner_t *learner, char *path) {
     return;
   }
 
+
   /* if the hash table is memory mapped, then we simply update the 
      learner structure and exit */
 
@@ -1493,10 +1664,13 @@ void write_online_learner_struct(learner_t *learner, char *path) {
       (0 < fprintf(output, MAGIC_ONLINE));
 
     /* save current model options - don't want them to change next time we learn */
-    learner->m_options = m_options;
+    learner->model.options = m_options;
+    learner->model.cp = m_cp;
+    learner->model.dt = m_dt;
     learner->u_options = u_options;
 
     /* make sure some stuff is zeroed out */
+    /* but leave others untouched, eg doc.A, doc.S, doc.count for shannon */
     learner->mmap_start = NULL; /* assert mmap_start == NULL */
     learner->mmap_learner_offset = 0;
     learner->mmap_hash_offset = 0;
@@ -1566,6 +1740,170 @@ void write_online_learner_struct(learner_t *learner, char *path) {
   }
 }
 
+bool_t merge_temp_tokens(learner_t *dest, learner_t *src) {
+  hash_value_t id;
+  byte_t buf[BUFSIZ+1];
+  char tok[(MAX_TOKEN_LEN+1)*MAX_SUBMATCH+EXTRA_TOKEN_LEN];
+  size_t n = 0;
+
+  const byte_t *p;
+  char *q;
+
+  l_item_t *k;
+
+  if( !tmp_seek_start(src) ) {
+    errormsg(E_ERROR, "cannot seek in temporary token file [%s]\n", 
+	     src->filename);
+    return 0;
+  }
+  if( !tmp_seek_end(dest) ) {
+    errormsg(E_ERROR, "cannot seek in temporary token file [%s]\n", 
+	     dest->filename);
+    return 0;
+  }
+
+  q = tok;
+  while( (n = tmp_read_block(src, buf, BUFSIZ, &p)) > 0 ) {
+    /*       p = buf; */
+    /*       p[n] = '\0'; */
+    while( n-- > 0 ) {
+      if( *p != TOKENSEP) {
+	*q++ = *p; /* copy into tok */
+      } else { /* interword space */ 
+	*q = 0; /* append NUL to tok */
+	/* now lookup weight in hash */
+	id = hash_full_token(tok);
+	k = find_in_learner(dest, id); 
+	if( !k || !FILLEDP(k) ) {
+	  tmp_grow(dest); /* just in case we're full */
+	  tmp_write_token(dest, tok);
+	}
+	q = tok; /* reset q */
+      }
+      p++;
+    }
+  }
+    
+
+  return 1;
+}
+
+bool_t merge_hashes(learner_t *dest, learner_t *src) {
+  register l_item_t *i, *j, *e;
+  alphabet_size_t ci, cj;
+
+  e = src->hash + src->max_tokens;
+  for(j = src->hash ; j != e; j++) {
+    if( FILLEDP(j) ) {
+      i = find_in_learner(dest, j->id);
+      if( i && !FILLEDP(i) &&
+	((100 * dest->unique_token_count) >= 
+	 (HASH_FULL * dest->max_tokens)) && grow_learner_hash(dest) ) {
+	i = find_in_learner(dest,j->id);
+	/* new i, go through all tests again */
+      }
+      if( i ) {
+	if( FILLEDP(i) ) {
+	  
+	  /* nothing */
+
+	} else if( /* !FILLEDP(i) && */
+		  ((100 * dest->unique_token_count) < 
+		   (HASH_FULL * dest->max_tokens) ) ) {
+
+	  SET(i->id, j->id);
+
+	  INCREMENT(dest->unique_token_count, 
+		    K_TOKEN_COUNT_MAX, overflow_warning);
+
+	  i->typ = j->typ;
+
+	  /* order accounting */
+	  dest->max_order = MAXIMUM(dest->max_order,i->typ.order);
+
+	  INCREMENT(dest->fixed_order_unique_token_count[i->typ.order],
+		    K_TOKEN_COUNT_MAX, overflow_warning);
+
+	}
+
+	INCREASE(i->count, j->count, 
+		 K_TOKEN_COUNT_MAX, overflow_warning);
+
+	dest->tmax = MAXIMUM(dest->tmax, i->count);
+
+	INCREASE(dest->full_token_count, j->count,
+		 K_TOKEN_COUNT_MAX, overflow_warning);
+
+	INCREASE(dest->fixed_order_token_count[i->typ.order], j->count,
+		  K_TOKEN_COUNT_MAX, skewed_constraints_warning);
+
+      }
+    }
+  }
+
+  for(ci = 0; ci < ASIZE; ci++) { 
+    for(cj = 0; cj < ASIZE; cj++) { 
+      dest->dig[ci][cj] += src->dig[ci][cj];
+    }
+  }
+
+  return 1;
+}
+
+
+bool_t merge_learner_struct(learner_t *learner, char *path) {
+  learner_t dummy;
+  bool_t ok = 0;
+  options_t m_sav, u_sav;
+
+  m_sav = m_options;
+  u_sav = u_options;
+
+  init_learner(&dummy, path, 1);
+
+  m_options = m_sav;
+  u_options = u_sav;
+
+  if( dummy.retype != 0 ) {
+    errormsg(E_WARNING, 
+	     "merging regular expressions is not supported, ignoring %s\n",
+	     path);
+    ok = 0;
+  } else {
+    /* in case these changed while initing dummy */
+    learner->model.options = m_options;
+    learner->model.cp = m_cp;
+    learner->model.dt = m_dt;
+
+    /* _before_ we fill the hash, we merge the temp tokens (we only
+       add those thokens not found in learner->hash) */
+    ok = 
+      merge_temp_tokens(learner, &dummy) &&
+      merge_hashes(learner, &dummy);
+  
+    if( ok ) {
+      learner->doc.A += dummy.doc.A;
+      learner->doc.S += dummy.doc.S;
+      learner->doc.count += dummy.doc.count;
+      learner->doc.nullcount += dummy.doc.nullcount;
+      /* can't use these when merging */
+      learner->alpha = 0.0;
+      learner->beta = 0.0;
+      learner->mu = 0.0;
+      learner->s2 = 0.0;
+    }
+  }
+
+  free_learner(&dummy);
+
+  if( !ok ) {
+    errormsg(E_WARNING, 
+	     "%s could not be merged, the learned category might be corrupt\n",
+	     path);
+  }
+
+  return ok;
+}
 
 /* returns an approximate binomial r.v.; if np < 10 and n > 20, 
  * a Poisson approximation is used, else the variable is exact.
@@ -1595,10 +1933,14 @@ token_count_t binomial(token_count_t n, double p) {
   return x;
 }
 
-void update_shannon_partials(learner_t *learner) {
+void update_shannon_partials(learner_t *learner, bool_t fulldoc) {
   hash_count_t i;
   weight_t ell, lell;
+  bool_t docount;
 
+  docount = (learner->doc.emp.top > 0);
+  /* if force is true, we have a document, else we check emp.top to 
+     see if this is a nonempty document */
   if( m_options & (1<<M_OPTION_CALCENTROPY) ) {
 
     learner->doc.emp.shannon = 0;
@@ -1630,9 +1972,16 @@ void update_shannon_partials(learner_t *learner) {
 	}
       }
 
-      emplist_add_to_reservoir(learner->doc.reservoir, 
-			       learner->doc.count, 
-			       &learner->doc.emp);
+      if( u_options & (1<<U_OPTION_CONFIDENCE) ) {
+	emplist_add_to_reservoir(learner->doc.reservoir, 
+				 learner->doc.count, 
+				 &learner->doc.emp);
+      }
+
+/*       fprintf(stderr, "udate_shannon A +(%f) S +(%f)\n",  */
+/* 	      -learner->doc.emp.shannon, (learner->doc.emp.shannon * learner->doc.emp.shannon)); */
+      learner->doc.A += -learner->doc.emp.shannon;
+      learner->doc.S += (learner->doc.emp.shannon * learner->doc.emp.shannon);
 
       /* clear the empirical counts and marks */
       for(i = 0; i < learner->doc.emp.top; i++) {
@@ -1643,12 +1992,13 @@ void update_shannon_partials(learner_t *learner) {
 	}
       }
 
-      learner->doc.A += -learner->doc.emp.shannon;
+      /* now reset the empirical features */
+      learner->doc.emp.top = 0;
+
     }
-
-    /* now reset the empirical features */
-    learner->doc.emp.top = 0;
-
+  }
+  if( docount ) {
+    learner->doc.count++;
   }
 }
 
@@ -1666,11 +2016,39 @@ void calc_shannon(learner_t *learner) {
   learner->s2 = 0.0;
   learner->alpha = 0.0;
   learner->beta = 0.0;
-  
+
+  effective_count = learner->doc.count; /* cast to real value for readability */
+
   if( (m_options & (1<<M_OPTION_CALCENTROPY)) &&
+      (learner->doc.count > 1) ) {
+    learner->shannon += -(learner->doc.A/effective_count);
+    learner->shannon2 = 
+      (effective_count * learner->doc.S - (learner->doc.A * learner->doc.A)) /
+      (effective_count * (effective_count - 1.0)); 
+
+/*     fprintf(stderr, "[%f %f %f %f]\n", effective_count * learner->doc.S, (learner->doc.A * learner->doc.A), (effective_count * learner->doc.S - (learner->doc.A * learner->doc.A)), (effective_count * (effective_count - 1.0)) ); */
+/*     fprintf(stderr, "calc_entropy eff %f sha %f sha2 %f A %f S %f\n", effective_count, learner->shannon, learner->shannon2, learner->doc.A , learner->doc.S); */
+
+  } else { /* no individual documents, so compute global entropy */
+
+    learner->shannon = 0.0;
+    learner->shannon2 = 0.0;
+
+    e = learner->hash + learner->max_tokens;
+    for(i = learner->hash; i != e; i++) {
+      if( FILLEDP(i) && 
+	  (i->typ.order == learner->max_order) ) {
+	learner->shannon += log((weight_t)i->count) * (weight_t)i->count; 
+      }
+    }
+    learner->shannon = 
+      -( learner->shannon/learner->full_token_count -
+	 log((weight_t)learner->full_token_count) );
+  }
+
+  if( (u_options & (1<<U_OPTION_CONFIDENCE)) &&
       (learner->doc.count > 0) ) {
 
-    effective_count = learner->doc.count;
     /* shannon was computed during update */
     jensen = 0.0;
     e = learner->hash + learner->max_tokens;
@@ -1686,7 +2064,6 @@ void calc_shannon(learner_t *learner) {
     }
 
     learner->mu /= effective_count;
-    learner->shannon = -(learner->doc.A/effective_count);
     learner->mu = -(learner->shannon + learner->mu);
 
     mu = 0.0;
@@ -1740,20 +2117,16 @@ void calc_shannon(learner_t *learner) {
       learner->beta = learner->s2/learner->mu;
     }
 
+
   } else {
+    learner->alpha = 0.0;
+    learner->beta = 0.0;
+    learner->mu = 0.0;
+    learner->s2 = 0.0;
+  }
 
-    learner->shannon = 0.0;
-    e = learner->hash + learner->max_tokens;
-    for(i = learner->hash; i != e; i++) {
-      if( FILLEDP(i) && 
-	  (i->typ.order == learner->max_order) ) {
-	learner->shannon += log((weight_t)i->count) * (weight_t)i->count; 
-      }
-    }
-    learner->shannon = 
-      -( learner->shannon/learner->full_token_count -
-	 log((weight_t)learner->full_token_count) );
-
+  if( m_options & (1<<M_OPTION_CALCENTROPY) ) {
+    clear_empirical(&empirical);
   }
 
   if( u_options & (1<<U_OPTION_VERBOSE) ) {
@@ -1783,7 +2156,7 @@ void reset_mbox_messages(learner_t *learner, MBOX_State *mbox) {
 void count_mbox_messages(learner_t *learner, Mstate mbox_state, char *textbuf) {
 
   if( !textbuf ) { 
-    update_shannon_partials(learner);
+    update_shannon_partials(learner, 0);
     /* don't count document */
   } else {
     switch(mbox_state) {
@@ -1797,8 +2170,7 @@ void count_mbox_messages(learner_t *learner, Mstate mbox_state, char *textbuf) {
 	      (learner->doc.emp.top == 0) ) {
 	    learner->doc.nullcount++;
 	  }
-	  update_shannon_partials(learner);
-	  learner->doc.count++;
+	  update_shannon_partials(learner, 1);
 	}
       }
       not_header = 0;
@@ -1845,7 +2217,7 @@ void hash_word_and_learn(learner_t *learner,
   hash_value_t id;
   l_item_t *i;
   char *s;
-  alphabet_size_t p,q;
+  alphabet_size_t p,q,len;
 
   for(s = tok; s && *s == DIAMOND; s++);
   if( s && (*s != EOTOKEN) ) { 
@@ -1892,18 +2264,16 @@ void hash_word_and_learn(learner_t *learner,
 
 	SET(i->id,id);
 
-	if( learner->unique_token_count < K_TOKEN_COUNT_MAX )
-	  { learner->unique_token_count++; } else { overflow_warning = 1; }
+	INCREMENT(learner->unique_token_count, 
+		  K_TOKEN_COUNT_MAX, overflow_warning);
 
 	i->typ = tt;
 
 	/* order accounting */
-	learner->max_order = (learner->max_order < i->typ.order) ? 
-	  i->typ.order : learner->max_order;
+	learner->max_order = MAXIMUM(learner->max_order,i->typ.order);
 
-	if( learner->fixed_order_unique_token_count[i->typ.order] < K_TOKEN_COUNT_MAX ) 
-	  { learner->fixed_order_unique_token_count[i->typ.order]++; } else 
-	    { overflow_warning = 1; }
+	INCREMENT(learner->fixed_order_unique_token_count[i->typ.order],
+		  K_TOKEN_COUNT_MAX, overflow_warning);
 
      	if( (u_options & (1<<U_OPTION_DEBUG)) ) {
      	  fprintf(stdout, "match %8lx ", (long unsigned int)i->id);
@@ -1915,30 +2285,23 @@ void hash_word_and_learn(learner_t *learner,
 	tmp_write_token(learner, tok);
       }
 
-      if( i->count < K_TOKEN_COUNT_MAX ) { 
-	i->count++; 
-	if( learner->t_max < i->count ) {
-	  learner->t_max = i->count;
+      INCREMENT(i->count, K_TOKEN_COUNT_MAX, overflow_warning);
+      learner->tmax = MAXIMUM(learner->tmax, i->count);
+
+      if( m_options & (1<<M_OPTION_CALCENTROPY) ) {
+	if( (learner->doc.emp.top < learner->doc.emp.max) ||
+	    emplist_grow(&learner->doc.emp) ) {
+	  i->tmp.read.eff++; /* this can never overflow before i->count */
+	  UNSETMARK(i); /* needed for calculating shannon */
+	  learner->doc.emp.stack[learner->doc.emp.top++] = i->id;
 	}
-	if( m_options & (1<<M_OPTION_CALCENTROPY) ) {
-	  if( (learner->doc.emp.top < learner->doc.emp.max) ||
-	      emplist_grow(&learner->doc.emp) ) {
-	    i->tmp.read.eff++; /* this can never overflow before i->count */
-	    UNSETMARK(i); /* needed for calculating shannon */
-	    learner->doc.emp.stack[learner->doc.emp.top++] = i->id;
-	  }
-	}
-      } else { 
-	overflow_warning = 1; 
       }
 
-      if( learner->full_token_count < K_TOKEN_COUNT_MAX )
-	{ learner->full_token_count++; } else 
-	  { /* this number is just cosmetic */ }
+      INCREMENT(learner->full_token_count, 
+		K_TOKEN_COUNT_MAX, overflow_warning);
 
-      if( learner->fixed_order_token_count[i->typ.order] < K_TOKEN_COUNT_MAX ) 
-	{ learner->fixed_order_token_count[i->typ.order]++; } else 
-	  { skewed_constraints_warning = 1; }
+      INCREMENT(learner->fixed_order_token_count[i->typ.order],
+		K_TOKEN_COUNT_MAX, skewed_constraints_warning);
 
     }
 
@@ -1950,14 +2313,22 @@ void hash_word_and_learn(learner_t *learner,
     /* now update digram frequency counts */
     if( tt.order == 1 ) { /* count each token only once */
       p = *tok++;
+      CLIP_ALPHABET(p);
+      len = 1;
       /* finally update character frequencies */
       while( *tok != EOTOKEN ) {
 	q = (unsigned char)*tok;
+	CLIP_ALPHABET(q);
 	if( learner->dig[p][q] < K_DIGRAM_COUNT_MAX ) 
 	  { learner->dig[p][q]++; } else { digramic_overflow_warning = 1; }
+	if( learner->dig[RESERVED_MARGINAL][q] < K_DIGRAM_COUNT_MAX )
+	  { learner->dig[RESERVED_MARGINAL][q]++; } /* no warning on overflow */
+
 	p = q;
 	tok++;
+	if( q != DIAMOND ) { len++; }
       }
+      learner->dig[RESERVED_TOKLEN][len]++;
 
       if( digramic_overflow_warning ) {
 	errormsg(E_WARNING,
@@ -1977,7 +2348,7 @@ void hash_word_and_learn(learner_t *learner,
 }
 
 /* initialize global learner object */
-void init_learner(learner_t *learner) {
+void init_learner(learner_t *learner, char *opath, bool_t readonly) {
   alphabet_size_t i, j;
   regex_count_t c;
   token_order_t z;
@@ -1987,18 +2358,19 @@ void init_learner(learner_t *learner) {
   learner->max_hash_bits = default_max_hash_bits;
   learner->full_token_count = 0;
   learner->unique_token_count = 0;
-  learner->t_max = 0;
-  learner->b_count = 0;
+  learner->tmax = 0;
   learner->logZ = 0.0;
   learner->shannon = 0.0;
+  learner->shannon2 = 0.0;
   learner->alpha = 0.0;
   learner->beta = 0.0;
   learner->mu = 0.0;
   learner->s2 = 0.0;
   learner->max_order = 0;
+  memset(learner->mediaprobs, 0 , TOKEN_CLASS_MAX * sizeof(score_t));
 
   learner->doc.A = 0.0;
-  learner->doc.C = 0.0;
+  learner->doc.S = 0.0;
   learner->doc.count = 0;
   learner->doc.nullcount = 0;
   learner->doc.emp.top = 0;
@@ -2006,7 +2378,10 @@ void init_learner(learner_t *learner) {
   learner->doc.emp.stack = NULL;
   memset(learner->doc.reservoir, 0, RESERVOIR_SIZE * sizeof(emplist_t));
 
-  learner->m_options = m_options;
+  learner->model.options = m_options;
+  learner->model.cp = m_cp;
+  learner->model.dt = m_dt;
+  learner->model.tmin = zthreshold;
   learner->u_options = u_options;
 
   learner->mmap_start = NULL;
@@ -2034,7 +2409,8 @@ void init_learner(learner_t *learner) {
     reset_mbox_messages(learner, &mbox);
   }
 
-  if( !(*online && read_online_learner_struct(learner,online)) ) {
+  if( !(opath && *opath && 
+	read_online_learner_struct(learner, opath, readonly)) ) {
     /* if we're here, we must do what read_online_... didn't do */
 
     /* allocate and zero room for hash */
@@ -2083,9 +2459,6 @@ void init_learner(learner_t *learner) {
     }
 
   }
-
-
-
 
   if( u_options & (1<<U_OPTION_MMAP) ) {
     MLOCK(learner->hash, sizeof(l_item_t) * learner->max_tokens);
@@ -2255,6 +2628,12 @@ void make_dirichlet_digrams(learner_t *learner) {
       }
     }
   }
+  /* clear other data */
+  for(i = 0; i < AMIN; i++) {
+    for(j = 0; j < ASIZE; j++) {
+      learner->dig[i][j] = 0.0;
+    }
+  }
 }
 
 void make_uniform_digrams(learner_t *learner) {
@@ -2268,6 +2647,156 @@ void make_uniform_digrams(learner_t *learner) {
 		"learner->dig[%d][%d] = %f\n", 
 		i, j, learner->dig[i][j]);
       }
+    }
+  }
+  /* clear other data */
+  for(i = 0; i < AMIN; i++) {
+    for(j = 0; j < ASIZE; j++) {
+      learner->dig[i][j] = 0.0;
+    }
+  }
+}
+
+
+void make_toklen_digrams(learner_t *learner) {
+  alphabet_size_t i, j;
+  weight_t lam[MAX_TOKEN_LEN+2];
+  weight_t total;
+  /* zero out usual digrams, we only use token length */
+  {
+    for(i = AMIN; i < ASIZE; i++) {
+      for(j = AMIN; j < ASIZE; j++) {
+	learner->dig[i][j] = 0.0;
+      }
+    }
+    for(j = AMIN; j < ASIZE; j++) {
+      learner->dig[RESERVED_MARGINAL][j] = 0.0;
+    }
+  }
+  /* note: toklen counts the number of transitions, not number of chars */
+  total = 0.0;
+  for(i = 2; i < MAX_TOKEN_LEN+2; i++) {
+    if( learner->dig[RESERVED_TOKLEN][i] <= 0.0 ) {
+      /* don't want infinities */
+      learner->dig[RESERVED_TOKLEN][i]++;
+    }
+    total += learner->dig[RESERVED_TOKLEN][i];
+  }  
+
+  lam[0] = 0.0; /* normalizing constant */
+  for(i = 2; i < MAX_TOKEN_LEN+2; i++) {
+    lam[i] = log(learner->dig[RESERVED_TOKLEN][i]/total) - i * log(ASIZE - AMIN);
+  }
+  for(i = 0; i < MAX_TOKEN_LEN+2; i++) {
+    if(0 && u_options & (1<<U_OPTION_DEBUG) ) {
+      fprintf(stdout,
+	      "learner->dig[%d][%d] = %f %f %f\n", 
+	      RESERVED_TOKLEN, i, learner->dig[RESERVED_TOKLEN][i],
+	      -i * log(ASIZE - AMIN), lam[i]);
+    }
+    learner->dig[RESERVED_TOKLEN][i] = UNPACK_DIGRAMS(PACK_DIGRAMS(lam[i]));
+  }
+}
+
+void make_mle_digrams(learner_t *learner) {
+  alphabet_size_t i, j;
+  double total;
+  double missing;
+
+  /* for the mle we use a slightly modified emprirical frequency histogram.
+     This is necessary because the true mle causes a singularity in classification
+     whenever a word contains a character transition which was never seen before.
+     The modification is to mix the true mle with a uniform distribution, but
+     the uniform only accounts for 1/total of the mass, so ie it disappears 
+     quickly.
+  */
+  for(i = AMIN; i < ASIZE; i++) {
+    total = 0.0;
+    missing = 0.0;
+    for(j = AMIN; j < ASIZE; j++) {
+      if( learner->dig[i][j] > 0.0 ) {
+	total += learner->dig[i][j];
+      } else {
+	missing++;
+      }
+    }
+    if( total > 0.0 ) {
+      if( missing > 0.0 ) {
+	missing = 1.0/missing;
+	for(j = AMIN; j < ASIZE; j++) {
+	  learner->dig[i][j] =
+	    UNPACK_DIGRAMS(PACK_DIGRAMS(log((learner->dig[i][j]/total) * (1.0 - missing) + missing)));
+	}	
+      } else {
+	for(j = AMIN; j < ASIZE; j++) {
+	  learner->dig[i][j] = 
+	    UNPACK_DIGRAMS(PACK_DIGRAMS(log(learner->dig[i][j] / total)));
+	}
+      }
+    } else {
+      for(j = AMIN; j < ASIZE; j++) {
+	learner->dig[i][j] = 
+	  UNPACK_DIGRAMS(PACK_DIGRAMS(-log(missing)));
+      }
+    }
+  }
+  /* clear other data */
+  for(i = 0; i < AMIN; i++) {
+    for(j = 0; j < ASIZE; j++) {
+      learner->dig[i][j] = 0.0;
+    }
+  }
+}
+
+void make_iid_digrams(learner_t *learner) {
+  alphabet_size_t i, j;
+  double total;
+  double missing;
+
+  /* the digrams here are not character transitions, but merely destination
+     character frequencies, ie the characters of a token are assumed
+     independent and identically distributed. */
+
+  total = 0.0;
+  missing = 0.0;
+
+  for(j = AMIN; j < ASIZE; j++) {
+    if( learner->dig[RESERVED_MARGINAL][j] > 0.0 ) {
+      total += learner->dig[RESERVED_MARGINAL][j];
+    } else {
+      missing++;
+    }
+  }
+  if( total > 0.0 ) {
+    if( missing > 0.0 ) {
+      missing = 1.0/missing;
+      for(j = AMIN; j < ASIZE; j++) {
+	learner->dig[RESERVED_MARGINAL][j] =
+	  UNPACK_DIGRAMS(PACK_DIGRAMS(log((learner->dig[RESERVED_MARGINAL][j]/total) * (1.0 - missing) + missing)));
+      }
+    } else {
+      for(j = AMIN; j < ASIZE; j++) {
+	learner->dig[RESERVED_MARGINAL][j] =
+	  UNPACK_DIGRAMS(PACK_DIGRAMS(log(learner->dig[RESERVED_MARGINAL][j] / total)));
+      }
+    }
+  } else {
+    for(j = AMIN; j < ASIZE; j++) {
+      learner->dig[RESERVED_MARGINAL][j] =
+	UNPACK_DIGRAMS(PACK_DIGRAMS(-log(missing)));
+    }
+  }
+
+  /* now make all transitions identical */
+  for(j = 0; j < ASIZE; j++) {
+    for(i = AMIN; i < ASIZE; i++) {
+      learner->dig[i][j] = learner->dig[RESERVED_MARGINAL][j];
+    }
+  }
+  /* clear other data */
+  for(i = 0; i < AMIN; i++) {
+    for(j = 0; j < ASIZE; j++) {
+      learner->dig[i][j] = 0.0;
     }
   }
 }
@@ -2436,6 +2965,13 @@ void make_entropic_digrams(learner_t *learner) {
       }
     }
   }
+
+  /* clear other data */
+  for(i = 0; i < AMIN; i++) {
+    for(j = 0; j < ASIZE; j++) {
+      learner->dig[i][j] = 0.0;
+    }
+  }
 }
 
 
@@ -2464,16 +3000,21 @@ void interpolate_digrams(weight_t N, weight_t count[], weight_t p[]) {
 weight_t calc_learner_digramic_excursion(learner_t *learner, char *tok) {
   register alphabet_size_t p, q;
   register weight_t t = 0.0;
-
+  register alphabet_size_t len;
   /* now update digram frequency counts */
   p = (unsigned char)*tok++;
+  CLIP_ALPHABET(p);
+  len = 1;
   /* finally update character frequencies */
   while( *tok != EOTOKEN ) {
     q = (unsigned char)*tok;
+    CLIP_ALPHABET(q);
     t += learner->dig[p][q];
     p = q;
     tok++;
+    if( q != DIAMOND ) { len++; }
   }
+  t += learner->dig[RESERVED_TOKLEN][len] - learner->dig[RESERVED_TOKLEN][0];
   return t;
 }
 
@@ -2845,12 +3386,43 @@ void theta_rescale(learner_t *learner, token_order_t r, score_t logupz, score_t 
 
 }
 
+/* the mediaprobs are the token probabilities for each token class.
+   (summing the mediaprobs) == 1. We put a uniform prior on the media. */
+void compute_mediaprobs(learner_t *learner) {
+  l_item_t *k, *i;
+  token_class_t j;
+  weight_t R, tmp;
+
+  R = (weight_t)learner->max_order;
+  for(j = 0; j < TOKEN_CLASS_MAX; j++) {
+    learner->mediaprobs[j] = 1.0/TOKEN_CLASS_MAX;
+  }
+
+  k = learner->hash + learner->max_tokens;
+  for(i = learner->hash; i != k; i++) {
+    if( FILLEDP(i) && NOTNULL(i->lam)) {
+      tmp = R * UNPACK_LWEIGHTS(i->tmp.min.ltrms) +
+	UNPACK_RWEIGHTS(i->tmp.min.dref);
+      learner->mediaprobs[i->typ.cls] +=
+	exp(R * UNPACK_LAMBDA(i->lam) + tmp) - exp(tmp);
+    }
+  }
+  
+  tmp = 0;
+  for(j = 0; j < TOKEN_CLASS_MAX; j++) {
+    learner->mediaprobs[j] *= exp(-learner->logZ); 
+    tmp += learner->mediaprobs[j];
+  }
+  /* should have tmp == 1.0 */
+}
+
 /* minimizes the divergence by solving for lambda one 
    component at a time.  */
 void minimize_learner_divergence(learner_t *learner) {
   l_item_t *i, *e;
   token_order_t r;
   token_count_t lzero, c = 0;
+  token_count_t zcut = 0;
   int itcount, mcount;
   score_t d, dd, b;
   score_t lam_delta, old_lam, new_lam;
@@ -2872,6 +3444,15 @@ void minimize_learner_divergence(learner_t *learner) {
   if( (m_options & (1<<M_OPTION_MULTINOMIAL)) || 
       (learner->max_order == 1) ) {
     qtol_multipass = 0;
+  }
+
+  if( learner->model.tmin != 0 ) {
+    /* ftreshold is unsigned */
+    if( learner->model.tmin > 0 ) { 
+      zcut = learner->model.tmin;
+    } else if (learner->model.tmin + learner->tmax > 0) {
+      zcut = learner->model.tmin + learner->tmax;
+    }
   }
 
   e = learner->hash + learner->max_tokens;
@@ -2937,7 +3518,8 @@ void minimize_learner_divergence(learner_t *learner) {
 
 	    old_lam = UNPACK_LAMBDA(i->lam);
 
-	    if( (i->typ.order == 1) || (i->count > ftreshold) ) {
+	    if( /* (i->typ.order == 1) ||  */
+		(i->count > zcut) ) {
 	      /* "iterative scaling" lower bound */
 	      new_lam = (log((score_t)i->count) - logXi -  
 			 UNPACK_RWEIGHTS(i->tmp.min.dref))/R + logzonr -
@@ -3006,8 +3588,9 @@ void minimize_learner_divergence(learner_t *learner) {
     mp_logz = learner->logZ;
   }
 
+  /* compute the probability mass of each token class (medium) separately */
+  compute_mediaprobs(learner);
 }
-
 
 /* dumps readable model weights to the output */
 void dump_model(learner_t *learner, FILE *out, FILE *in) {
@@ -3035,11 +3618,15 @@ void dump_model(learner_t *learner, FILE *out, FILE *in) {
 	  (long int)learner->unique_token_count,
 	  (long int)learner->doc.count);
 
-  fprintf(out, MAGIC8_o, learner->shannon, 
+  fprintf(out, MAGIC8_o, learner->shannon, learner->shannon2);
+
+  fprintf(out, MAGIC10_o, 
 	  learner->alpha, learner->beta,
 	  learner->mu, learner->s2);
 
-  fprintf(out, MAGIC9, (long int)learner->t_max, (long int)learner->b_count);
+  write_mediaprobs(out, learner);
+
+  fprintf(out, MAGIC9, (long int)learner->model.tmin, (long int)learner->tmax);
 
   /* print out any regexes we might need */
   for(c = 0; c < regex_count; c++) {
@@ -3055,7 +3642,8 @@ void dump_model(learner_t *learner, FILE *out, FILE *in) {
   }
 
   /* print options */
-  fprintf(out, MAGIC4_o, m_options, print_model_options(m_options, (char*)buf));
+  fprintf(out, MAGIC4_o, m_options, m_cp, m_dt,
+	  print_model_options(m_options, m_cp, (char*)buf));
 
   fprintf(out, MAGIC6); 
 
@@ -3123,12 +3711,12 @@ void learner_prefill_lambdas(learner_t *learner, category_t **pxcat) {
   *pxcat = NULL;
   xcat->fullfilename = strdup(learner->filename);
   if( open_category(cat) ) {
-    if( xcat->m_options & (1<<M_OPTION_WARNING_BAD) ) {
+    if( xcat->model.options & (1<<M_OPTION_WARNING_BAD) ) {
       if( u_options & (1<<U_OPTION_VERBOSE) ) {
 	errormsg(E_WARNING, "old category file %s may have bad data\n",
 		xcat->fullfilename);
       }
-    } else if( (xcat->m_options == m_options) &&
+    } else if( (xcat->model.options == m_options) &&
 	       (xcat->retype == learner->retype) &&
 	       (fabs((xcat->model_unique_token_count/
 		      (double)learner->unique_token_count) - 1.0) < 0.15) ) {
@@ -3212,12 +3800,18 @@ void optimize_and_save(learner_t *learner) {
   /* transposition smoothing */
 /*   transpose_digrams(); */
 
-  if( u_options & (1<<U_OPTION_LAPLACE) ) {
+  if( *digtype && !strcmp(digtype, "uniform") ) {
     make_uniform_digrams(learner);
-  } else if( u_options & (1<<U_OPTION_DIRICHLET) ) {
+  } else if( *digtype && !strcmp(digtype, "dirichlet") ) {
     make_dirichlet_digrams(learner);
-  } else if( u_options & (1<<U_OPTION_JAYNES) ) {
+  } else if( *digtype && !strcmp(digtype, "maxent") ) {
     make_entropic_digrams(learner);
+  } else if( *digtype && !strcmp(digtype, "toklen") ) {
+    make_toklen_digrams(learner);
+  } else if( *digtype && !strcmp(digtype, "mle") ) {
+    make_mle_digrams(learner);
+  } else if( *digtype && !strcmp(digtype, "iid") ) {
+    make_iid_digrams(learner);
   } else {
     make_uniform_digrams(learner);
   }
@@ -3273,7 +3867,7 @@ void optimize_and_save(learner_t *learner) {
 
   /* now save the model to a file */
   if( !opencat || !fast_partial_save_learner(learner, opencat) ) {
-    save_learner(learner);
+    save_learner(learner, online);
   }
   if( opencat ) { free_category(opencat); }
 }
@@ -3321,11 +3915,20 @@ char *handle_indents_and_appends(char *textbuf) {
  * MAIN FUNCTIONS                                          *
  ***********************************************************/
 void learner_preprocess_fun() {
-  init_learner(&learner);
+  category_count_t r;
+
+  init_learner(&learner, online, 0);
+
+  for(r = 0; r < ronline_count; r++) {
+    merge_learner_struct(&learner, ronline[r]);
+  }
 }
 
 void learner_post_line_fun(char *buf) {
-  count_mbox_messages(&learner, mbox.state, buf);
+  /* only call this when buf is NULL, ie end of file */
+  if( !buf && (m_options & (1<<M_OPTION_MBOX_FORMAT)) ) {
+    count_mbox_messages(&learner, mbox.state, buf);
+  }
 }
 
 void learner_postprocess_fun() {
@@ -3349,6 +3952,7 @@ void classifier_preprocess_fun() {
 		   default_max_tokens, 
 		   default_max_hash_bits); /* sets cached to zero */
   }
+  reset_all_scores();
 
   if( u_options & (1<<U_OPTION_DUMP) ) {
     for(c = 0; c < cat_count; c++) {
@@ -3360,10 +3964,21 @@ void classifier_preprocess_fun() {
       fprintf(stdout, "score_delta\n");
     } else if( u_options & (1<<U_OPTION_SCORES) ) {
       fprintf(stdout, "avg_score * complexity\n");
+    } else if( u_options & (1<<U_OPTION_VAR) ) {
+      fprintf(stdout, "avg_score * complexity # s2\n");
     } else {
       fprintf(stdout, "lambda digref -renorm multi shannon id\n");
     }
+  } else if( u_options & (1<<U_OPTION_DEBUG) ) {
+    if( u_options & (1<<U_OPTION_PRIOR_CORRECTION) ) {
+      for(c = 0; c < cat_count; c++) {
+	fprintf(stdout, "%s%10s %5.2f ", (c ? " " : "# prior: "), 
+		cat[c].filename, cat[c].prior);
+      }
+      fprintf(stdout, "\n");
+    }
   }
+
 }
 
 void classifier_cleanup_fun() {
@@ -3382,7 +3997,9 @@ void classifier_cleanup_fun() {
 
 
 int email_line_filter(MBOX_State *mbox, char *buf) {
-  return mbox_line_filter(mbox, buf, &xml);
+  int retval = mbox_line_filter(mbox, buf, &xml);
+  count_mbox_messages(&learner, mbox->state, buf);
+  return retval;
 }
 
 #if defined HAVE_MBRTOWC
@@ -3394,6 +4011,9 @@ int w_email_line_filter(MBOX_State *mbox, wchar_t *buf) {
 int set_option(int op, char *optarg) {
   int c = 0;
   switch(op) {
+  case '@':
+    /* this is an official NOOP, it MUST be ignored (see spherecl) */
+    break;
   case '0':
     u_options &= ~(1<<U_OPTION_NOZEROLEARN);
     break;
@@ -3408,17 +4028,19 @@ int set_option(int op, char *optarg) {
     break;
   case 'e':
     if( !strcasecmp(optarg, "alnum") ) {
-      m_options |= (1<<M_OPTION_CHAR_ALNUM);
+      m_cp = CP_ALNUM;
     } else if( !strcasecmp(optarg, "alpha") ) {
-      m_options |= (1<<M_OPTION_CHAR_ALPHA);
+      m_cp = CP_ALPHA;
     } else if( !strcasecmp(optarg, "cef") ) {
-      m_options |= (1<<M_OPTION_CHAR_CEF);
+      m_cp = CP_CEF;
     } else if( !strcasecmp(optarg, "graph") ) {
-      m_options |= (1<<M_OPTION_CHAR_GRAPH);
+      m_cp = CP_GRAPH;
     } else if( !strcasecmp(optarg, "adp") ) {
-      m_options |= (1<<M_OPTION_CHAR_ADP);
+      m_cp = CP_ADP;
+    } else if( !strcasecmp(optarg, "cef2") ) {
+      m_cp = CP_CEF2;
     } else if( !strcasecmp(optarg, "char") ) {
-      m_options |= (1<<M_OPTION_CHAR_CHAR);
+      m_cp = CP_CHAR;
     } else {
       errormsg(E_WARNING,
 	       "unrecognized option \"%s\", ignoring.\n", 
@@ -3603,13 +4225,16 @@ int set_option(int op, char *optarg) {
 	errormsg(E_FATAL, "could not load category %s\n",
 		 cat[cat_count].fullfilename);
       }
-      if( sanitize_model_options(&m_options,&cat[cat_count]) ) {
+      if( sanitize_model_options(&m_options,&m_cp,&cat[cat_count]) ) {
 	ngram_order = (ngram_order < cat[cat_count].max_order) ? 
 	  cat[cat_count].max_order : ngram_order;
 	cat_count++;
       } 
     }
     c++;
+    break;
+  case 'P':
+    u_options |= (1<<U_OPTION_PRIOR_CORRECTION);
     break;
   case 'q':
     quality = atoi(optarg);
@@ -3701,18 +4326,23 @@ int set_option(int op, char *optarg) {
     }
     c++;
     break;
+  case 'F':
+    u_options |= (1<<U_OPTION_CLASSIFY_MULTIFILE);
+    break;
   case 'v':
     u_options |= (1<<U_OPTION_VERBOSE);
     break;
   case 'L':
-    if( *optarg && !strcmp(optarg, "uniform") ) {
-      u_options |= (1<<U_OPTION_LAPLACE);
-    } else if(*optarg && !strcmp(optarg, "dirichlet") ) {
-      u_options |= (1<<U_OPTION_DIRICHLET);
-    } else if(*optarg && !strcmp(optarg, "maxent") ) {
-      u_options |= (1<<U_OPTION_JAYNES);
+    if( *optarg && 
+	(!strcmp(optarg, "uniform") ||
+	 !strcmp(optarg, "dirichlet") ||
+	 !strcmp(optarg, "maxent") ||
+	 !strcmp(optarg, "mle") ||
+	 !strcmp(optarg, "iid") ||
+	 !strcmp(optarg, "toklen")) ) {
+      digtype = optarg;
     } else {
-      errormsg(E_FATAL, "-L option needs \"uniform\", \"dirichlet\" or \"maxent\"\n");
+      errormsg(E_FATAL, "-L option needs one of \"uniform\", \"dirichlet\", \"maxent\", \"toklen\", \"mle\"\n");
     }
     c++;
     break;
@@ -3739,9 +4369,20 @@ int set_option(int op, char *optarg) {
     break;
   case 'o':
     if( !*optarg ) {
-      errormsg(E_ERROR, "category name must not be empty\n");
-    } else {
+      errormsg(E_ERROR, "category name must not be empty in -o switch\n");
+    } else if( !*online ) {
       online = sanitize_path(optarg, "");
+    } else {
+      errormsg(E_WARNING, 
+	       "multiple -o switches not supported, ignoring all but the first\n");
+    }
+    c++;
+    break;
+  case 'O':
+    if( !*optarg ) {
+      errormsg(E_ERROR, "category name must not be empty in -o switch\n");
+    } else {
+      ronline[ronline_count++] = sanitize_path(optarg, "");
     }
     c++;
     break;
@@ -3763,8 +4404,11 @@ int set_option(int op, char *optarg) {
     m_options &= ~(1<<M_OPTION_I18N);
 #endif
     break;
+  case 'Y':
+    u_options |= (1<<U_OPTION_MEDIACOUNTS);
+    break;
   case 'z':
-    ftreshold = atoi(optarg);
+    zthreshold = atoi(optarg);
     c++;
     break;
   default:
@@ -3784,10 +4428,11 @@ void sanitize_options() {
     exit(1);
   }
 
-  if( *online && (m_options & (1<<M_OPTION_CALCENTROPY)) ) {
-    errormsg(E_WARNING, 
-	     "-X switch cannot be used with -o switch, disabling -X.\n");
-    m_options &= ~(1<<M_OPTION_CALCENTROPY);
+  if( (*online || (ronline_count > 0)) && 
+      (u_options & (1<<U_OPTION_CONFIDENCE)) ) {
+/*     errormsg(E_WARNING,  */
+/* 	     "-X switch cannot be used with -o switch, disabling -X.\n"); */
+    m_options &= ~(1<<U_OPTION_CONFIDENCE);
   }
 
   if( (u_options & (1<<U_OPTION_DECIMATE)) &&
@@ -3835,11 +4480,10 @@ void sanitize_options() {
     /* for mboxes, only compute ngrams for each line individually */ 
 /*     m_options &= ~(1<<M_OPTION_NGRAM_STRADDLE_NL); */
 
-    /* always pretend the -X switch was used */
-/*     if( u_options & (1<<U_OPTION_LEARN) ) { */
-/*       m_options |= (1<<M_OPTION_CALCENTROPY); */
-/*       u_options |= (1<<U_OPTION_CONFIDENCE); */
-/*     } */
+    /* always calculate entropy statistics when learning */
+    if( u_options & (1<<U_OPTION_LEARN) ) {
+      m_options |= (1<<M_OPTION_CALCENTROPY);
+    }
   }
 
 
@@ -3871,12 +4515,12 @@ void sanitize_options() {
 
   if( m_options & (1<<M_OPTION_MULTINOMIAL) ) { 
     if( cat_count == 1 ) {
-      if( cat[0].model_type == simple ) {
+      if( cat[0].model.type == simple ) {
 	m_options |= (1<<M_OPTION_CALCENTROPY);
       }
     } else if( cat_count > 1 ) {
       for(c = 1; c < cat_count; c++) {
-	if( cat[c].model_type == sequential ) { break; }
+	if( cat[c].model.type == sequential ) { break; }
 	if( cat[c].retype != cat[c-1].retype ) { break; }
       }
       if( c == cat_count ) {
@@ -3886,30 +4530,24 @@ void sanitize_options() {
     if( !(m_options & (1<<M_OPTION_CALCENTROPY)) ) {
       errormsg(E_WARNING,
 	      "not all categories support multinomial calculations, disabling (-M switch)\n");
+      m_options &= ~(1<<M_OPTION_MULTINOMIAL);
     }
   }
 
   /* unless overridden, we use alpha character classes only */
-  if( !(m_options & (1<<M_OPTION_CHAR_ALPHA)) &&
-      !(m_options & (1<<M_OPTION_CHAR_ALNUM)) &&
-      !(m_options & (1<<M_OPTION_CHAR_CEF)) &&
-      !(m_options & (1<<M_OPTION_CHAR_ADP)) &&
-      !(m_options & (1<<M_OPTION_CHAR_CHAR)) &&
-      !(m_options & (1<<M_OPTION_CHAR_GRAPH)) ) {
+  if( m_cp == CP_DEFAULT ) {
     if( m_options & (1<<M_OPTION_MBOX_FORMAT) ) {
-      m_options |= (1<<M_OPTION_CHAR_ADP);
+      m_cp = CP_ADP;
     } else {
-      m_options |= (1<<M_OPTION_CHAR_ALPHA);
+      m_cp = CP_ALPHA;
     }
   }
 
-  if( !(u_options & (1<<U_OPTION_JAYNES)) &&
-      !(u_options & (1<<U_OPTION_LAPLACE)) &&
-      !(u_options & (1<<U_OPTION_DIRICHLET)) ) {
+  if( !*digtype ) {
     if( m_options & (1<<M_OPTION_MBOX_FORMAT) ) {
-      u_options |= (1<<U_OPTION_LAPLACE);
+      digtype = "uniform";
     } else {
-      u_options |= (1<<U_OPTION_DIRICHLET);
+      digtype = "dirichlet";
     }
   }
 }
@@ -3925,6 +4563,7 @@ int main(int argc, char **argv) {
   void (*word_fun)(char *, token_type_t, regex_count_t) = NULL;
   char *(*pre_line_fun)(char *) = NULL;
   void (*post_line_fun)(char *) = NULL;
+  void (*post_file_fun)(char *) = NULL;
   void (*postprocess_fun)(void) = NULL;
   void (*cleanup_fun)(void) = NULL;
   int (*line_filter)(MBOX_State *, char *) = NULL;
@@ -3961,7 +4600,7 @@ int main(int argc, char **argv) {
 
   /* parse the options */
   while( (op = getopt(argc, argv, 
-		      "01Aac:Dde:f:G:g:H:h:ijL:l:mMNno:q:RrST:UVvw:x:Xz:")) > -1 ) {
+		      "01Aac:Dde:f:FG:g:H:h:ijL:l:mMNno:O:Ppq:RrST:UVvw:x:XYz:@")) > -1 ) {
     set_option(op, optarg);
   }
 
@@ -3977,9 +4616,15 @@ int main(int argc, char **argv) {
       u_options |= (1<<U_OPTION_FASTEMP);
       empirical.track_features = 1; 
       post_line_fun = line_score_categories;
+      post_file_fun = NULL;
+      postprocess_fun = NULL;
+    } else if( u_options & (1<<U_OPTION_CLASSIFY_MULTIFILE) ) {
+      post_line_fun = NULL;
+      post_file_fun = file_score_categories;
       postprocess_fun = NULL;
     } else {
       post_line_fun = NULL;
+      post_file_fun = NULL;
       postprocess_fun = score_categories;
     }
     cleanup_fun = classifier_cleanup_fun;
@@ -3989,11 +4634,8 @@ int main(int argc, char **argv) {
 
     preprocess_fun = learner_preprocess_fun;
     word_fun = learner_word_fun;
-    if( m_options & (1<<M_OPTION_MBOX_FORMAT) ) {
-      post_line_fun = learner_post_line_fun;
-    } else {
-      post_line_fun = NULL;
-    }
+    post_line_fun =  learner_post_line_fun;
+    post_file_fun = NULL;
     postprocess_fun = learner_postprocess_fun;
     cleanup_fun = learner_cleanup_fun;
 
@@ -4061,11 +4703,11 @@ int main(int argc, char **argv) {
 	case S_IFDIR:
 	  if( !(m_options & (1<<M_OPTION_I18N)) ) {
 	    process_directory(inputfile, line_filter, character_filter,
-			      word_fun, pre_line_fun, post_line_fun);
+			      word_fun, pre_line_fun, post_line_fun, post_file_fun);
 	  } else {
 #if defined HAVE_MBRTOWC
 	    w_process_directory(inputfile, w_line_filter, w_character_filter,
-				word_fun, pre_line_fun, post_line_fun);
+				word_fun, pre_line_fun, post_line_fun, post_file_fun);
 #else
 	    errormsg(E_ERROR, "international support not available (recompile).\n");
 #endif
@@ -4087,11 +4729,13 @@ int main(int argc, char **argv) {
       }
       fclose(input);
 
+      if( post_file_fun ) { (*post_file_fun)(inputfile); }
+
     } else { /* unrecognized file name */
 
-      errormsg(E_ERROR, "couldn't open %s\n", argv[optind]);
-      usage(argv);
-      exit(1);
+      errormsg(E_FATAL, "couldn't open %s\n", argv[optind]);
+      /* usage(argv); */
+      /* exit(1); */
 
     }
     optind++;
@@ -4129,6 +4773,9 @@ int main(int argc, char **argv) {
 
       /* must close before freeing in_iobuf, in case setvbuf was called */
       fclose(input); 
+
+      if( post_file_fun ) { (*post_file_fun)(inputfile); }
+
     }
   }
   

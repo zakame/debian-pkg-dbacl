@@ -1,9 +1,9 @@
 AC_PREREQ(2.59)
-AC_INIT([dbacl],[1.12],[laird@lbreyer.com])
+AC_INIT([dbacl],[1.14],[laird@lbreyer.com])
 AC_CONFIG_AUX_DIR(config)
 AC_CANONICAL_SYSTEM
 AC_GNU_SOURCE
-AM_INIT_AUTOMAKE([dbacl],[1.12],[laird@lbreyer.com])
+AM_INIT_AUTOMAKE([dbacl],[1.14],[laird@lbreyer.com])
 AM_CONFIG_HEADER(src/config.h)
 
 ## Checks for host information.
@@ -29,7 +29,10 @@ case $host in
 	*-*-darwin*)
 		AC_DEFINE([OS_DARWIN],[],[this is a Mac system])
 		;;
-	-*-*-*)
+	*-*-hpux*)
+		AC_DEFINE([OS_HPUX],[],[this is an HP-UX system])
+		;;
+	*-*-*)
 		AC_DEFINE([OS_UNKNOWN],[],[this is an unrecognized system])
 		;;
 esac

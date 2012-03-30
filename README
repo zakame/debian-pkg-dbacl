@@ -80,6 +80,8 @@ optimize hash table overhead.
 To build and install the program, you can execute the following steps
 from within the source DBACL directory:
 
+(note: you may have to replace make with gmake if you get errors)
+
 ./configure
 make
 make check
@@ -105,7 +107,9 @@ INTERNATIONALIZATION
 dbacl uses the current locale for processing. 8-bit clean multibyte
 character sets (such as UTF-8) are supported in the default mode, and
 arbitrary multibyte character sets require the -i command line
-option. 
+option. Note that your version of dbacl might not support international
+(wide) characters. This is checked for during compilation, see the 
+output of configure.
 
 The following remarks only apply to previous versions of dbacl.
 In version 1.8.1 and later, regexes are only available in multibyte

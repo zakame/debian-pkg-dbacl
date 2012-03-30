@@ -29,8 +29,8 @@ mkdir "$DBACL_PATH"
 
 cat "$DBACL_PATH/mbox" \
     | $DBACL -l dummy -X -d -T email \
-    | grep '# shannon' \
-    | awk '{print $9/log(2)}' \
+    | grep '# alpha' \
+    | awk '{print $7/log(2)}' \
     | tr '\n' ' ' \
     > "$DBACL_PATH/out1"
 

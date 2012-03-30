@@ -3,7 +3,7 @@
  *  
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
+ * the Free Software Foundation; either version 3 of the License, or
  * (at your option) any later version.
  * 
  * This program is distributed in the hope that it will be useful,
@@ -13,7 +13,7 @@
  * 
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA.
  * 
  * Author:   Laird Breyer <laird@lbreyer.com>
  */
@@ -32,9 +32,9 @@
 #endif
 #endif
 
-#define COPYBLURB "Copyright (c) 2002,2003,2004,2005 L.A. Breyer. All rights reserved.\n" \
+#define COPYBLURB "Copyright (c) 2002-2007 L.A. Breyer. All rights reserved.\n" \
                   "%s comes with ABSOLUTELY NO WARRANTY, and is licensed\n" \
-	          "to you under the terms of the GNU General Public License.\n\n"
+	          "to you under the terms of the GNU General Public License 3 or later.\n\n"
 
 #define DEFAULT_CATPATH "DBACL_PATH"
 /* define this to save category files with a temporary name, then atomically
@@ -104,10 +104,12 @@
 #define ntohs(x) (x)
 #endif
 
-/* some systems seem to have broken sys/types */
 #if defined OS_SUN
-
 #include <ieeefp.h>
+#endif
+
+/* some systems seem to have broken sys/types */
+#if defined OS_SUN || defined OS_HPUX
 #include <inttypes.h>
 
 typedef uint8_t u_int8_t;
@@ -420,6 +422,13 @@ typedef u_int16_t digitized_weight_t;
 #define EXTRA_TOKEN_LEN (EXTRA_CLASS_LEN + 2)
 #define MULTIBYTE_EPSILON 10 /* enough for a multibyte char and a null char */
 
+/* make sure a character is in the alphabet range */
+#define CLIP_ALPHABET(x) x = (((unsigned char)x) < AMIN) ? AMIN : (x)
+/* the space outside of AMIN-ASIZE is used for auxiliary RESERVED_* data */
+#define RESERVED_UNUSED0  0 /* dig[0][0-255] */
+#define RESERVED_MARGINAL 2 /* dig[2][0-255] counts single char marginal freqs */
+#define RESERVED_TOKLEN   1 /* dig[1][0-MAX_TOKEN_LEN] counts token lengths */
+
 /* decides how we compute the shannon entropy */
 #undef SHANNON_STIRLING
 
@@ -464,14 +473,13 @@ typedef u_int16_t digitized_weight_t;
 #define U_OPTION_GROWHASH               15
 #define U_OPTION_INDENTED               16
 #define U_OPTION_NOZEROLEARN            17
-#define U_OPTION_LAPLACE                18
-#define U_OPTION_DIRICHLET              19
-#define U_OPTION_JAYNES                 20
 #define U_OPTION_MMAP                   21
 #define U_OPTION_CONFIDENCE             22
 #define U_OPTION_VAR                    23
-
 #define U_OPTION_HM_ADDRESSES           24
+#define U_OPTION_CLASSIFY_MULTIFILE     25
+#define U_OPTION_PRIOR_CORRECTION       26
+#define U_OPTION_MEDIACOUNTS            27
 
 /* model options */
 #define M_OPTION_REFMODEL               1
@@ -482,10 +490,6 @@ typedef u_int16_t digitized_weight_t;
 #define M_OPTION_CASEN                  6
 #define M_OPTION_CALCENTROPY            7
 #define M_OPTION_MULTINOMIAL            8
-#define M_OPTION_CHAR_CHAR              9
-#define M_OPTION_CHAR_ALPHA             10
-#define M_OPTION_CHAR_ALNUM             11
-#define M_OPTION_CHAR_GRAPH             12
 #define M_OPTION_HEADERS                13
 #define M_OPTION_PLAIN                  14
 #define M_OPTION_NOPLAIN                15
@@ -493,14 +497,12 @@ typedef u_int16_t digitized_weight_t;
 #define M_OPTION_SHOW_ALT               17
 #define M_OPTION_HTML                   18
 #define M_OPTION_XHEADERS               19
-#define M_OPTION_CHAR_CEF               20
 #define M_OPTION_SHOW_SCRIPT            21
 #define M_OPTION_SHOW_HTML_COMMENTS     22
 #define M_OPTION_USE_STDTOK             23
 #define M_OPTION_ATTACHMENTS            24
 #define M_OPTION_WARNING_BAD            25
 #define M_OPTION_SHOW_STYLE             26
-#define M_OPTION_CHAR_ADP               27
 #define M_OPTION_SHOW_FORMS             28
 #define M_OPTION_NOHEADERS              29
 #define M_OPTION_NGRAM_STRADDLE_NL      30
@@ -511,6 +513,15 @@ typedef u_int16_t digitized_weight_t;
 
 
 typedef u_int32_t options_t; /* make sure big enough for all options */
+typedef enum {
+  DT_DEFAULT=0,
+  DT_UNIFORM, DT_DIRICHLET, DT_MAXENT, DT_MLE, DT_IID
+} digtype_t;
+typedef enum {
+  CP_DEFAULT=0, 
+  CP_CHAR, CP_ALPHA, CP_ALNUM, CP_GRAPH, 
+  CP_CEF, CP_ADP, CP_CEF2
+} charparser_t;
 #define FMT_printf_options_t "d"
 #define FMT_scanf_options_t "ld"
 
@@ -594,6 +605,10 @@ typedef enum {gcUNDEF = 0, gcDISCARD, gcTOKEN, gcTOKEN_END, gcIGNORE} good_char_
 
 #define NOTNULL(x) ((x) > 0)
 
+#define MAXIMUM(x,y) (((x)<(y))?(y):(x))
+#define INCREMENT(x,y,z) if( (x) < (y) ) { (x)++; } else { z = 1; }
+#define INCREASE(x,d,y,z) if( (x) < ((y)-(d)) ) { (x) += (d); } else { z = 1; }
+
 #if defined PORTABLE_CATS
 #define SIGNATURE VERSION " " DD DL DW " " "portable"
 
@@ -633,27 +648,30 @@ typedef enum {gcUNDEF = 0, gcDISCARD, gcTOKEN, gcTOKEN_END, gcIGNORE} good_char_
 #define MAGIC3    "# hash_size %hd" \
                   " features %ld unique_features %ld" \
                   " documents %ld\n"
-#define MAGIC4_i  "# options %" FMT_scanf_options_t " (%s)\n"
-#define MAGIC4_o  "# options %" FMT_printf_options_t " (%s)\n"
+#define MAGIC4_i  "# options %" FMT_scanf_options_t " %hd %hd (%s)\n"
+#define MAGIC4_o  "# options %" FMT_printf_options_t " %hd %hd (%s)\n"
 #define MAGIC5_i  "# regex %s\n"
 #define MAGIC5_o  "# regex %s||%s\n"
 #define MAGIC5_wo "# regex %ls||%s\n"
 #define MAGIC7_i  "# antiregex %s\n"
 #define MAGIC7_o  "# antiregex %s||%s\n"
 #define MAGIC7_wo "# antiregex %ls||%s\n"
-#define MAGIC9    "# binned_features %ld max_feature_count %ld\n" 
+#define MAGIC9    "# min_feature_count %ld max_feature_count %ld\n" 
 #define RESTARTPOS 8
 #define MAGIC6    "#\n"
 #define MAGIC8_i  "# shannon %" FMT_scanf_score_t \
-                  " alpha %" FMT_scanf_score_t \
+                  " shannon_s2 %" FMT_scanf_score_t "\n"
+#define MAGIC8_o  "# shannon %" FMT_printf_score_t \
+                  " shannon_s2 %" FMT_printf_score_t "\n"
+#define MAGIC10_i "# alpha %" FMT_scanf_score_t \
                   " beta %" FMT_scanf_score_t \
                   " mu %" FMT_scanf_score_t \
                   " s2 %" FMT_scanf_score_t "\n"
-#define MAGIC8_o  "# shannon %" FMT_printf_score_t \
-                  " alpha %" FMT_printf_score_t \
+#define MAGIC10_o "# alpha %" FMT_printf_score_t \
                   " beta %" FMT_printf_score_t \
                   " mu %" FMT_printf_score_t \
                   " s2 %" FMT_printf_score_t "\n"
+#define MAGIC11   "# medialp "
 
 #define MAGIC_ONLINE "# dbacl " SIGNATURE " online memory dump\n"
 
@@ -662,6 +680,8 @@ typedef enum {gcUNDEF = 0, gcDISCARD, gcTOKEN, gcTOKEN_END, gcIGNORE} good_char_
 #define MAGIC_DUMPTBL_i "%f %f %d %lx "
 
 /* data structures */
+#define TOKEN_CLASS_MAX 16
+#define TOKEN_ORDER_MAX 8
 typedef struct {
   token_class_t cls: 4;
   token_order_t order: 3;
@@ -700,7 +720,6 @@ typedef enum {simple, sequential} mtype;
 typedef struct {
   char *filename;
   char *fullfilename;
-  mtype model_type;
   token_order_t max_order;
   token_count_t fcomplexity;
   token_count_t model_unique_token_count;
@@ -718,13 +737,21 @@ typedef struct {
   score_t score_div;
   score_t score_s2;
   score_t score_shannon;
-  score_t score_exp;
   score_t shannon;
+  score_t shannon_s2;
   score_t alpha;
   score_t beta;
   score_t mu;
   score_t s2;
-  options_t m_options;
+  score_t prior;
+  token_count_t fmiss;
+  token_count_t mediacounts[TOKEN_CLASS_MAX];
+  struct {
+    mtype type;
+    options_t options;
+    charparser_t cp;
+    digtype_t dt;
+  } model;
   options_t c_options;
   c_item_t *hash;
   byte_t *mmap_start;
@@ -791,16 +818,22 @@ typedef struct {
   hash_count_t max_tokens;
   token_count_t full_token_count;
   token_count_t unique_token_count;
-  token_count_t t_max;
-  token_count_t b_count;
+  token_count_t tmax;
   score_t logZ;
   score_t divergence;
   score_t shannon;
+  score_t shannon2;
   score_t alpha;
   score_t beta;
   score_t mu;
   score_t s2;
-  options_t m_options;
+  score_t mediaprobs[TOKEN_CLASS_MAX];
+  struct {
+    options_t options;
+    charparser_t cp;    
+    digtype_t dt;
+    int tmin;
+  } model;
   options_t u_options;
   byte_t *mmap_start;
   long mmap_learner_offset;
@@ -810,7 +843,7 @@ typedef struct {
   long int regex_token_count[MAX_RE + 1];
   struct {
     score_t A;
-    score_t C;
+    score_t S;
     document_count_t count;
     document_count_t nullcount;
     bool_t skip;
@@ -871,6 +904,20 @@ typedef enum { msuUNDEF=1, msuTRACK, msuMIME, msuARMOR, msuOTHER } Msubstate;
 typedef enum { mhsUNDEF=1, mhsSUBJECT, mhsFROM, mhsTO, mhsMIME, mhsXHEADER, mhsTRACE} Mhstate;
 typedef enum { maUNDEF=1, maENABLED} Marmor;
 typedef enum { psPLAIN, psUUENCODE } Mplainstate;
+typedef enum { hidUNDEF=1, hidCONTINUATION,
+	       hidRECEIVED, hidRETURN_PATH, hidRETURN_RECEIPT_TO, hidREPLY_TO,
+	       hidMESSAGE_ID, hidREFERENCES, hidIN_REPLY_TO,
+	       hidRESENT_, hidORIGINAL_,
+	       hidFROM, hidCC, hidBCC, hidSENT, hidSENDER,
+	       hidTO,
+	       hidSUBJECT,
+	       hidCONTENT_, hidMIME_VERSION,
+	       hidLIST_,
+	       hidX_,
+	       hidUSER_AGENT,
+	       hidX_MS, hidCATEGORY, hidPRIORITY, hidIMPORTANCE, hidTHREAD_,
+	       hidCOMMENTS, hidKEYWORDS, hidNOTE
+} Mheaderid;
 
 typedef struct {
   char *cache;
@@ -894,6 +941,7 @@ typedef struct {
   Mstate state;
   Msubstate substate;
   Mhstate hstate;
+  Mheaderid hid;
   Marmor armor;
   MIME_Struct header, body;
   bool_t prev_line_empty;
@@ -945,13 +993,13 @@ extern "C"
   void sanitize_options();
   int set_option(int op, char *optarg);
 
-  void init_learner(learner_t *learner);
+  void init_learner(learner_t *learner, char *opath, bool_t readonly);
   void free_learner(learner_t *learner);
 
   void reset_mbox_messages(learner_t *learner, MBOX_State *mbox);
   void count_mbox_messages(learner_t *learner, Mstate mbox_state, char *buf);
   void calc_shannon(learner_t *learner);
-  void update_shannon_partials(learner_t *learner);
+  void update_shannon_partials(learner_t *learner, bool_t fulldoc);
   void optimize_and_save(learner_t *learner);
 
   l_item_t *find_in_learner(learner_t *learner, hash_value_t id);
@@ -963,15 +1011,15 @@ extern "C"
   void make_uniform_digrams(learner_t *learner);
   void transpose_digrams(learner_t *learner);
 
-  bool_t read_online_learner_struct(learner_t *learner, char *path);
-  void write_online_learner_struct(learner_t *learner, char *path);
-  error_code_t save_learner(learner_t *learner);
+  bool_t read_online_learner_struct(learner_t *learner, char *opath, bool_t readonly);
+  void write_online_learner_struct(learner_t *learner, char *opath);
+  error_code_t save_learner(learner_t *learner, char *opath);
 
 
   /* these are defined in catfun.c */
   char *sanitize_path(char *in, char *extension);
-  error_code_t sanitize_model_options(options_t *to, category_t *cat);
-  /*@shared@*/ char *print_model_options(options_t opt, /*@out@*/ char *buf);
+  error_code_t sanitize_model_options(options_t *to, charparser_t *mcp, category_t *cat);
+  /*@shared@*/ char *print_model_options(options_t opt, charparser_t mcp, /*@out@*/ char *buf);
   char *print_user_options(options_t opt, char *buf);
 
   void init_empirical(empirical_t *emp, hash_count_t dmt, hash_bit_count_t dmhb);
@@ -1038,7 +1086,8 @@ extern "C"
 			 void (*character_filter)(XML_State *, char *), 
 			 void (*word_fun)(char *, token_type_t, regex_count_t), 
 			 char *(*pre_line_fun)(char *),
-			 void (*post_line_fun)(char *));
+			 void (*post_line_fun)(char *),
+			 void (*post_file_fun)(char *));
 
   void init_mbox_line_filter(MBOX_State *mbox);
   void free_mbox_line_filter(MBOX_State *mbox);
@@ -1048,7 +1097,9 @@ extern "C"
 
   /* probabilities in probs.c */
   double log_poisson(int k, double lambda);
-
+  double sample_mean(double x, double n);
+  double sample_variance(double ss, double x, double n);
+  double min_prob(int k, int n, double mu[], double sigma[]);
 
 #if defined HAVE_MBRTOWC
 /*   int w_b64_code(wchar_t c); */
@@ -1091,7 +1142,8 @@ extern "C"
 			   void (*character_filter)(XML_State *, wchar_t *), 
 			   void (*word_fun)(char *, token_type_t, regex_count_t), 
 			   char *(*pre_line_fun)(char *),
-			   void (*post_line_fun)(char *));
+			   void (*post_line_fun)(char *),
+			   void (*post_file_fun)(char *));
 
 #endif
 

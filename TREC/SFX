@@ -50,9 +50,26 @@ function usage() {
 	echo ""
 	echo "Possible values for XXX:"
 
-	tail +`expr $SKIP + 1` $0 | gunzip -c | tar t | grep 'TREC/OPTIONS.' | sed 's/^.*OPTIONS.//'
+	tail -n +`expr $SKIP + 1` $0 | gunzip -c | tar t | grep 'TREC/OPTIONS.' | sed 's/^.*OPTIONS.//'
 
 }
+
+function warn_fs {
+    echo "################################################################"
+    echo "# A ramdisk speeds up simulation and protects your disks.      #"
+    echo "# If you haven't done so already, use a ramdisk!               #"
+    echo "# % mkdir /path/to/ramdisk                                     #"
+    echo "# % mount tmpfs /path/to/ramdisk -t tmpfs -o size=150m         #"
+    echo "# % cp OPTTIONS.default dbacl-xxx.TREC.sfx.sh /path/to/ramdisk #"
+    echo "# % cd /path/to/ramdisk                                        #"
+    echo "# % ./dbacl-xxx.TREC.sfx.sh                                    #"
+    echo "# (run simulation, copy results file away from ramdisk)        #"
+    echo "# % umount /path/to/ramdisk                                    #"
+    echo "################################################################"
+    echo "Press Ctrl-C to abort, or Enter to proceed."
+    read
+}
+
 
 OPTARG=$1
 if [ -z $OPTARG ]; then
@@ -67,8 +84,10 @@ echo ""
 echo "Installing $NAME - please wait...."
 echo ""
 
+warn_fs
+
 rm -rf "$W/$NAME"
-tail +`expr $SKIP + 1` $0 | gunzip -c | tar x
+tail -n +`expr $SKIP + 1` $0 | gunzip -c | tar x
 
 if [ -d "$W/$NAME" ]; then
 	if [ -n $OPTARG ]; then
@@ -93,10 +112,10 @@ if [ -d "$W/$NAME" ]; then
 	echo "---------"
 
 	cd "$W/$NAME"
-	./configure "--prefix=$W" && make && make check && make install-strip
+	./configure "--prefix=$W" && make && make check && make install
 	if [ -x "$W/bin/dbacl" ]; then
 
-	    for f in initialize finalize classify train ; do
+	    for f in initialize finalize classify train checkpoint restart; do
 		rm -f "$W/$f" && cp "$W/share/dbacl/TREC/$f" "$W/$f"
 		chmod u+x "$W/$f"
 	    done
@@ -109,6 +128,16 @@ if [ -d "$W/$NAME" ]; then
 	cd "$W"
 	rm -rf "$W/db" && mkdir "$W/db"
 	rm -f "$W/stderr.log"
+
+	. $W/share/dbacl/TREC/OPTIONS
+
+	rm -rf "$W/audit" && mkdir "$W/audit"
+	if [ -f "$W/share/dbacl/TREC/$AUDITCOMMAND" ]; then
+	    cp "$W/share/dbacl/TREC/$AUDITCOMMAND" "$W/$AUDITCOMMAND"
+	    chmod u+x "$W/$AUDITCOMMAND"
+	    "$W/$AUDITCOMMAND" initialize "$W"
+	fi
+
 	"$W/train" ham "$W/share/dbacl/TREC/basic-email"
 	"$W/train" spam "$W/share/dbacl/TREC/basic-email"
 

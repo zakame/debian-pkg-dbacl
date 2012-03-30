@@ -1,5 +1,7 @@
+datarootdir ?= $(prefix)/share
 documentationdir = $(pkgdatadir)/TREC
-documentation_DATA = initialize classify train finalize \
+documentation_DATA = initialize classify train finalize checkpoint restart \
+	audit-graph audit-scores \
 	basic-email verify-stderr OPTIONS README \
 	OPTIONS.adp-dir-d \
 	OPTIONS.adp-unif-d \
@@ -17,7 +19,9 @@ documentation_DATA = initialize classify train finalize \
 	OPTIONS.TREC2005.4adp \
 	TREC2005.txt
 
-EXTRA_DIST = initialize classify train finalize \
+shutupdir = $(datarootdir)
+EXTRA_DIST = initialize classify train finalize checkpoint restart \
+	audit-graph audit-scores \
 	basic-email verify-stderr SFX OPTIONS README \
 	OPTIONS.adp-dir-d \
 	OPTIONS.adp-unif-d \
