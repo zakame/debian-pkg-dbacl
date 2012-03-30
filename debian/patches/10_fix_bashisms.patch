@@ -1,5 +1,7 @@
-# Fix bashism found by Raphael Geissert <atomo64@gmail.com>
-# Patch by Chris Lamb <chris@chris-lamb.co.uk>
+Description: Fix bashism found by Raphael Geissert <atomo64@gmail.com>
+Author: Patch by Chris Lamb <chris@chris-lamb.co.uk>
+Origin: vendor, http://bugs.debian.org/cgi-bin/bugreport.cgi?msg=8;bug=489560
+Bug-Debian: http://bugs.debian.org/489560
 diff -urNd dbacl-1.12.orig/TREC/finalize dbacl-1.12/TREC/finalize
 --- dbacl-1.12.orig/TREC/finalize	2008-08-24 14:07:48.000000000 +0100
 +++ dbacl-1.12/TREC/finalize	2008-08-24 14:08:51.000000000 +0100
