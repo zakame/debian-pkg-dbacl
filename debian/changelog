@@ -7,8 +7,9 @@ dbacl (1.12-3) unstable; urgency=low
     + Add autotools-dev to B-D
     + Remove duplicate fields
   * Add doc-base stuff
+  * Use dh(1) to simplify debian/rules
 
- -- Zak B. Elep <zakame@zakame.net>  Fri, 30 Mar 2012 18:38:10 +0800
+ -- Zak B. Elep <zakame@zakame.net>  Sat, 31 Mar 2012 01:37:25 +0800
 
 dbacl (1.12-2.1) unstable; urgency=low
 

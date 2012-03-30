@@ -1,26 +1,20 @@
 #!/usr/bin/make -f
 # rules -- Debian packaging rules for dbacl
 
-# Let's use CDBS! :)
+%:
+	dh ${@}
 
-include /usr/share/cdbs/1/rules/debhelper.mk
-include /usr/share/cdbs/1/class/autotools.mk
+override_dh_auto_configure:
+	aclocal
+	autoconf
+	autoheader
+	automake --add-missing --copy --force-missing --gnu
 
-# Move installed docs to proper Debian location
-install/dbacl::
-	rm -rf $(DEB_DESTDIR)/usr/share/dbacl/doc
-	$(MAKE) -C doc install \
-		documentationdir=$(DEB_DESTDIR)/usr/share/doc/dbacl
-# Move the examples to $(documentationdir)/examples
-	mkdir $(DEB_DESTDIR)/usr/share/doc/dbacl/examples
-	for file in example*.risk toy.risk prop.pl sample*.txt ; do \
-	  mv -f $(DEB_DESTDIR)/usr/share/doc/dbacl/$$file \
-	    $(DEB_DESTDIR)/usr/share/doc/dbacl/examples ; \
-	done
-# Set proper permissions for TREC files
-#	for file in verify-stderr README basic-email OPTIONS ; do \
-#	  chmod 0644 $(DEB_DESTDIR)/usr/share/dbacl/TREC/$$file ; \
-#	done
-	for file in initialize classify train finalize ; do \
-	  chmod 0755 $(DEB_DESTDIR)/usr/share/dbacl/TREC/$$file ; \
+	dh_auto_configure
+
+override_dh_fixperms:
+	dh_fixperms
+
+	for file in classify finalize initialize train ; do \
+	  chmod 755 debian/dbacl/usr/share/dbacl/TREC/$$file ; \
 	done

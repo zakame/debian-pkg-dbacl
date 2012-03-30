@@ -1,2 +1,3 @@
 01_manpage_doc_paths.diff
+03_Fix_doc_install_path.patch
 10_fix_bashisms.patch
