@@ -1,15 +1,13 @@
 Source: dbacl
 Section: text
 Priority: optional
-Build-Depends: cdbs, debhelper (>= 5.0.0), libreadline-gplv2-dev, libslang2-dev
+Build-Depends: autotools-dev, cdbs, debhelper (>= 5.0.0), libreadline-gplv2-dev, libslang2-dev
 Maintainer: Zak B. Elep <zakame@zakame.net>
-Standards-Version: 3.8.0
+Standards-Version: 3.9.3
 Homepage: http://www.lbreyer.com/gpl.html
 
 Package: dbacl
 Architecture: any
-Section: text
-Priority: optional
 Depends: ${misc:Depends}, ${shlibs:Depends}
 Description: digramic Bayesian text classifier
  dbacl can distill text documents into categories, and then
