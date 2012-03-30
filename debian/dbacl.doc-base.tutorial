@@ -1,0 +1,10 @@
+Document: dbacl-tutorial
+Title: Language models, classification and dbacl
+Author: Laird A. Breyer
+Abstract: This is a non-mathematical tutorial on how to use the dbacl
+ Bayesian text classifier.
+Section: Text
+
+Format: HTML
+Index: /usr/share/doc/dbacl/tutorial.html
+Files: /usr/share/doc/dbacl/*.html

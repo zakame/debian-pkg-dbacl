@@ -2,8 +2,13 @@ dbacl (1.12-3) unstable; urgency=low
 
   * Acknowledge NMU by ryanakca, thanks (Closes: #628616)
   * Update to dpkg-source 3.0 (quilt)
+  * debian/control:
+    + Standards-Version 3.9.3
+    + Add autotools-dev to B-D
+    + Remove duplicate fields
+  * Add doc-base stuff
 
- -- Zak B. Elep <zakame@zakame.net>  Fri, 30 Mar 2012 18:15:31 +0800
+ -- Zak B. Elep <zakame@zakame.net>  Fri, 30 Mar 2012 18:38:10 +0800
 
 dbacl (1.12-2.1) unstable; urgency=low
 

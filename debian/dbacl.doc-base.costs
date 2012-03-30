@@ -1,0 +1,11 @@
+Document: dbacl-costs
+Title: The dbacl Text Classifier: Cost Minimization with bayesol
+Author: Laird A. Breyer
+Abstract: This not describes the details of cost minimization for the "dbacl"
+ classifier, as implemented in the utility "bayesol".  Due to limited
+ precision of floating point operations, such a minimization cannot be done
+ in the straightforward way.
+Section: Text
+
+Format: PostScript
+Files: /usr/share/doc/dbacl/costs.ps.gz

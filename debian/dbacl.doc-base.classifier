@@ -1,0 +1,13 @@
+Document: dbacl-classifier
+Title: The dbacl Text Classifier
+Author: Laird A. Breyer
+Abstract: This is a summary of the mathematical aspects of the design of
+ "dbacl", a digramic Bayesian classifier for text documents.  "dbacl"
+ computes maximum (relative) entropy models for text corpora and can
+ compute the Bayesian posterior distribution for a given document in terms
+ of any number of previously computed modules.  Both learning and
+ classifying is O(n) in the number of lines of the input documents.
+Section: Text
+
+Format: PostScript
+Files: /usr/share/doc/dbacl/dbacl.ps.gz
