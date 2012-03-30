@@ -3,7 +3,7 @@
  *  
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
+ * the Free Software Foundation; either version 3 of the License, or
  * (at your option) any later version.
  * 
  * This program is distributed in the hope that it will be useful,
@@ -13,7 +13,7 @@
  * 
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA.
  * 
  * Author:   Laird Breyer <laird@lbreyer.com>
  */
@@ -30,6 +30,7 @@
 #include "dbacl.h"
 
 extern options_t m_options; 
+extern charparser_t m_cp; 
 extern options_t u_options; 
 
 extern empirical_t empirical;
@@ -75,8 +76,24 @@ char *sanitize_path(char *in, char *extension) {
 
 #define MOPTION(x,opt) (((opt) & (1<<(x))) ? ("|" #x) : "")
 
-char *print_model_options(options_t opt, char *buf) {
-  strcpy(buf, MOPTION(M_OPTION_REFMODEL, opt));
+
+char *print_charparser_type(charparser_t mcp, char *buf) {
+  strcpy(buf, 
+	 (mcp == CP_DEFAULT) ? "CP_DEFAULT" :
+	 (mcp == CP_CHAR) ? "CP_CHAR" :
+	 (mcp == CP_ALPHA) ? "CP_ALPHA" :
+	 (mcp == CP_ALNUM) ? "CP_ALNUM" :
+	 (mcp == CP_GRAPH) ? "CP_GRAPH" :
+	 (mcp == CP_CEF) ? "CP_CEF" :
+	 (mcp == CP_ADP) ? "CP_ADP" :
+	 (mcp == CP_CEF2) ? "CP_CEF2" : "CP_UNKNOWN");
+  return buf;
+}
+
+
+char *print_model_options(options_t opt, charparser_t mcp,  char *buf) {
+  print_charparser_type(mcp, buf);
+  strcat(buf, MOPTION(M_OPTION_REFMODEL, opt));
   strcat(buf, MOPTION(M_OPTION_TEXT_FORMAT, opt));
   strcat(buf, MOPTION(M_OPTION_MBOX_FORMAT, opt));
   strcat(buf, MOPTION(M_OPTION_XML, opt));
@@ -84,12 +101,6 @@ char *print_model_options(options_t opt, char *buf) {
   strcat(buf, MOPTION(M_OPTION_CASEN, opt));
   strcat(buf, MOPTION(M_OPTION_CALCENTROPY, opt));
   strcat(buf, MOPTION(M_OPTION_MULTINOMIAL, opt));
-  strcat(buf, MOPTION(M_OPTION_CHAR_ALPHA, opt));
-  strcat(buf, MOPTION(M_OPTION_CHAR_ALNUM, opt));
-  strcat(buf, MOPTION(M_OPTION_CHAR_GRAPH, opt));
-  strcat(buf, MOPTION(M_OPTION_CHAR_ADP, opt));
-  strcat(buf, MOPTION(M_OPTION_CHAR_CEF, opt));
-  strcat(buf, MOPTION(M_OPTION_CHAR_CHAR, opt));
   strcat(buf, MOPTION(M_OPTION_HEADERS, opt));
   strcat(buf, MOPTION(M_OPTION_PLAIN, opt));
   strcat(buf, MOPTION(M_OPTION_NOPLAIN, opt));
@@ -125,16 +136,14 @@ char *print_user_options(options_t opt, char *buf) {
   strcat(buf, MOPTION(U_OPTION_GROWHASH, opt));
   strcat(buf, MOPTION(U_OPTION_INDENTED, opt));
   strcat(buf, MOPTION(U_OPTION_NOZEROLEARN, opt));
-  strcat(buf, MOPTION(U_OPTION_LAPLACE, opt));
-  strcat(buf, MOPTION(U_OPTION_DIRICHLET, opt));
-  strcat(buf, MOPTION(U_OPTION_JAYNES, opt));
   strcat(buf, MOPTION(U_OPTION_MMAP, opt));
   strcat(buf, MOPTION(U_OPTION_CONFIDENCE, opt));
   strcat(buf, MOPTION(U_OPTION_VAR, opt));
   return buf;
 }
 
-error_code_t sanitize_model_options(options_t *mopt, category_t *cat) {
+error_code_t sanitize_model_options(options_t *mopt, charparser_t *mcp,
+				    category_t *cat) {
   options_t mask;
 
   /* things that always override mopt */
@@ -158,73 +167,81 @@ error_code_t sanitize_model_options(options_t *mopt, category_t *cat) {
     (1<<M_OPTION_USE_STDTOK)|
     (1<<M_OPTION_CALCENTROPY)|
     (1<<M_OPTION_MULTINOMIAL);
-  *mopt |= (cat->m_options & mask);
+  *mopt |= (cat->model.options & mask);
 
   /* things that are problematic */
 
   if( *mopt & (1<<M_OPTION_TEXT_FORMAT) ) {
-    if( cat->m_options & (1<<M_OPTION_MBOX_FORMAT) ) {
+    if( cat->model.options & (1<<M_OPTION_MBOX_FORMAT) ) {
       errormsg(E_WARNING,
 	      "category %s was learned with -T email, forcing -T text\n",
 	      cat->filename);
     }
   } else if( *mopt & (1<<M_OPTION_MBOX_FORMAT) ) {
-    if( cat->m_options & (1<<M_OPTION_TEXT_FORMAT) ) {
+    if( cat->model.options & (1<<M_OPTION_TEXT_FORMAT) ) {
       errormsg(E_WARNING,
 	      "category %s was learned with -T text, forcing -T email\n",
 	      cat->filename);
     }
   } else {
-    *mopt |= (cat->m_options & ((1<<M_OPTION_TEXT_FORMAT)|(1<<M_OPTION_MBOX_FORMAT)));
+    *mopt |= (cat->model.options & ((1<<M_OPTION_TEXT_FORMAT)|(1<<M_OPTION_MBOX_FORMAT)));
   }
 
   if( *mopt & (1<<M_OPTION_XML) ) {
-    if( cat->m_options & (1<<M_OPTION_HTML) ) {
+    if( cat->model.options & (1<<M_OPTION_HTML) ) {
       errormsg(E_WARNING,
 	      "category %s was learned with -T html, forcing -T xml\n",
 	      cat->filename);
     }
   } else if( *mopt & (1<<M_OPTION_HTML) ) {
-    if( cat->m_options & (1<<M_OPTION_XML) ) {
+    if( cat->model.options & (1<<M_OPTION_XML) ) {
       errormsg(E_WARNING,
 	      "category %s was learned with -T xml, forcing -T html\n",
 	      cat->filename);
     }
   } else {
-    *mopt |= (cat->m_options & ((1<<M_OPTION_XML)|(1<<M_OPTION_HTML)));
+    *mopt |= (cat->model.options & ((1<<M_OPTION_XML)|(1<<M_OPTION_HTML)));
   }
 
   if( *mopt & (1<<M_OPTION_PLAIN) ) {
-    if( cat->m_options & (1<<M_OPTION_NOPLAIN) ) {
+    if( cat->model.options & (1<<M_OPTION_NOPLAIN) ) {
       errormsg(E_WARNING,
 	      "category %s was learned with -T email:noplain, forcing -T email:plain\n",
 	      cat->filename);
     }
   } else if( *mopt & (1<<M_OPTION_NOPLAIN) ) {
-    if( cat->m_options & (1<<M_OPTION_PLAIN) ) {
+    if( cat->model.options & (1<<M_OPTION_PLAIN) ) {
       errormsg(E_WARNING,
 	      "category %s was learned with -T email:plain, forcing -T email:noplain\n",
 	      cat->filename);
     }
   } else {
-    *mopt |= (cat->m_options & ((1<<M_OPTION_NOPLAIN)|(1<<M_OPTION_PLAIN)));
+    *mopt |= (cat->model.options & ((1<<M_OPTION_NOPLAIN)|(1<<M_OPTION_PLAIN)));
   }
 
-  mask = 
-    (1<<M_OPTION_CHAR_ALPHA)|
-    (1<<M_OPTION_CHAR_ALNUM)|
-    (1<<M_OPTION_CHAR_CHAR)|
-    (1<<M_OPTION_CHAR_GRAPH)|
-    (1<<M_OPTION_CHAR_ADP)|
-    (1<<M_OPTION_CHAR_CEF);
+/*   mask =  */
+/*     (1<<M_OPTION_CHAR_ALPHA)| */
+/*     (1<<M_OPTION_CHAR_ALNUM)| */
+/*     (1<<M_OPTION_CHAR_CHAR)| */
+/*     (1<<M_OPTION_CHAR_GRAPH)| */
+/*     (1<<M_OPTION_CHAR_ADP)| */
+/*     (1<<M_OPTION_CHAR_CEF); */
 
-  if( (*mopt & mask) && ((cat->m_options & mask) != (*mopt & mask)) ) {
+/*   if( (*mopt & mask) && ((cat->m_options & mask) != (*mopt & mask)) ) { */
+/*     errormsg(E_FATAL, */
+/* 	    "category %s has incompatible token set (check -e switch)\n", */
+/* 	    cat->filename); */
+/*     return 0; */
+/*   } else { */
+/*     *mopt |= (cat->m_options & mask); */
+/*   } */
+  if( (*mcp != CP_DEFAULT) && (*mcp != cat->model.cp) ) {
     errormsg(E_FATAL,
 	    "category %s has incompatible token set (check -e switch)\n",
 	    cat->filename);
     return 0;
   } else {
-    *mopt |= (cat->m_options & mask);
+    *mcp = cat->model.cp;
   }
 
   return 1;
@@ -429,15 +446,18 @@ void init_category(category_t *cat) {
     cat->score_div = 0.0;
     cat->score_s2 = 0.0;
     cat->score_shannon = 0.0;
-    cat->score_exp = 0.0;
     cat->shannon = 0.0;
+    cat->shannon_s2 = 0.0;
     cat->alpha = 0.0;
     cat->beta = 0.0;
     cat->mu = 0.0;
     cat->s2 = 0.0;
+    cat->prior = 0.0;
     cat->complexity = 0.0;
     cat->fcomplexity = 0;
+    cat->fmiss = 0;
     cat->max_order = 0;
+    memset(cat->mediacounts, 0, sizeof(token_count_t)*TOKEN_CLASS_MAX);
     p = strrchr(cat->fullfilename, '/');
     if( p ) {
       cat->filename = p + 1; /* only keep basename */
@@ -450,8 +470,10 @@ void init_category(category_t *cat) {
       if( p ) { *p = '\0'; }
     }
     cat->retype = 0;
-    cat->model_type = simple;
-    cat->m_options = 0;
+    cat->model.type = simple;
+    cat->model.options = 0;
+    cat->model.cp = 0;
+    cat->model.dt = 0;
     cat->c_options = 0;
     cat->hash = NULL;
     cat->mmap_offset = 0;
@@ -586,9 +608,11 @@ void init_purely_random_text_category(category_t *cat) {
   cat->hash = NULL;
   cat->mmap_start = NULL;
   cat->mmap_offset = 0;
-  cat->model_type = simple;
+  cat->model.type = simple;
   cat->max_order = 1;
-  cat->m_options = 0;
+  cat->model.options = 0;
+  cat->model.cp = 0;
+  cat->model.dt = 0;
 }
 
 c_item_t *find_in_category(category_t *cat, hash_value_t id) {
@@ -625,7 +649,7 @@ void score_word(char *tok, token_type_t tt, regex_count_t re) {
   weight_t shannon_correction = 0.0;
   weight_t lambda, ref, oldscore;
   bool_t apply;
-  alphabet_size_t pp, pc;
+  alphabet_size_t pp, pc, len;
   hash_value_t id;
   char *q;
   register c_item_t *k = NULL;
@@ -696,7 +720,6 @@ void score_word(char *tok, token_type_t tt, regex_count_t re) {
       }
     }
 
-
     /* now do scoring for all available categories */
     for(i = 0; i < cat_count; i++) {
 
@@ -726,22 +749,29 @@ void score_word(char *tok, token_type_t tt, regex_count_t re) {
 	  /* now compute the reference weight from digram model,
 	     (while duplicating the digitization error) */
 	  pp = (unsigned char)*tok;
+	  CLIP_ALPHABET(pp);
 	  q = tok + 1;
+	  len = 1;
 	  while( *q != EOTOKEN ) {
 	    if( *q == '\r' ) {
 	      q++;
 	      continue;
 	    }
 	    pc = (unsigned char)*q;
+	    CLIP_ALPHABET(pc);
 	    ref += UNPACK_DIGRAMS(cat[i].dig[pp][pc]);
 	    pp = pc;
 	    q++;
+	    if( *q != DIAMOND ) { len++; }
 	  }
+	  ref += UNPACK_DIGRAMS(cat[i].dig[RESERVED_TOKLEN][len]) -
+	    UNPACK_DIGRAMS(cat[i].dig[RESERVED_TOKLEN][0]);
 	  ref = UNPACK_RWEIGHTS(PACK_RWEIGHTS(ref));
 
 	}
 
 	/* update the complexity */
+	/* note: complexity has nothing to do with Kolmogorov's definition */
 	/* this is actually very simple in hindsight, but took
 	   me a long time to get right. Different versions of dbacl
 	   compute the complexity in different ways, and I kept changing
@@ -799,11 +829,12 @@ void score_word(char *tok, token_type_t tt, regex_count_t re) {
 	cat[i].complexity += cat[i].delta;
 
 	/* now adjust the score */
-	switch(cat[i].model_type) {
+	switch(cat[i].model.type) {
 	case simple:
 	  multinomial_correction = h ?
 	    (log((weight_t)cat[i].complexity) - log((weight_t)h->count)) : 0.0;
-	  cat[i].score += lambda + multinomial_correction + ref - cat[i].renorm;
+	  cat[i].score += 
+	    lambda + multinomial_correction + ref - cat[i].renorm;
 	  break;
 	case sequential:
 	default:
@@ -814,9 +845,16 @@ void score_word(char *tok, token_type_t tt, regex_count_t re) {
 	  break;
 	}
 
+	if( !k || !NTOH_ID(k->id) ) {
+	  /* missing data */
+	  cat[i].fmiss++;
+	}
+
 	if( tt.order == 1 ) {
 	  /* sample variance */
-	  cat[i].score_s2 += ((oldscore - cat[i].score) * (oldscore - cat[i].score));
+	  cat[i].score_s2 += (cat[i].score - oldscore) * (cat[i].score - oldscore);
+	  /* only count medium for 1-grams */
+	  cat[i].mediacounts[tt.cls]++;
 	}
 
       }
@@ -824,10 +862,16 @@ void score_word(char *tok, token_type_t tt, regex_count_t re) {
       if( u_options & (1<<U_OPTION_DUMP) ) {
 	if( u_options & (1<<U_OPTION_SCORES) ) {
 	  fprintf(stdout, " %8.2f * %-6.1f\t",  
-		  -cat[i].score/cat[i].complexity,
+		  -sample_mean(cat[i].score, cat[i].complexity),
 		  cat[i].complexity);
 	} else if( u_options & (1<<U_OPTION_POSTERIOR) ) {
 	  fprintf(stdout, " %8.2f\t", oldscore - cat[i].score);
+	} else if( u_options & (1<<U_OPTION_VAR) ) {
+	  fprintf(stdout, " %8.2f * %-6.1f # %-8.2f\t",
+		  -sample_mean(cat[i].score,cat[i].complexity),
+		  cat[i].complexity,
+		  sample_variance(cat[i].score_s2, cat[i].score,
+				  cat[i].complexity)/cat[i].complexity);
 	} else {
 	  fprintf(stdout, 
 		  "%7.2f %7.2f %7.2f %7.2f %8lx\t", 
@@ -884,15 +928,15 @@ confidence_t gamma_pvalue(category_t *cat, double obs) {
 error_code_t load_category_header(FILE *input, category_t *cat) {
   char buf[MAGIC_BUFSIZE];
   char scratchbuf[MAGIC_BUFSIZE];
-  short int shint_val;
+  short int shint_val, shint_val2;
   long int lint_val1, lint_val2, lint_val3;
 
   if( input ) {
     if( !fgets(buf, MAGIC_BUFSIZE, input) ||
 	strncmp(buf, MAGIC1, MAGIC1_LEN) ) {
       errormsg(E_ERROR,
-	      "not a dbacl " SIGNATURE " category file [%s]\n", 
-	      cat->fullfilename);
+	       "not a dbacl " SIGNATURE " category file [%s]\n",
+	       cat->fullfilename);
       return 0;
     } 
 
@@ -908,9 +952,9 @@ error_code_t load_category_header(FILE *input, category_t *cat) {
     cat->delta = 1.0/(score_t)(cat->max_order);
     cat->renorm = cat->delta * cat->logZ;
     if( scratchbuf[0] == 'm' ) {
-      cat->model_type = simple;
+      cat->model.type = simple;
     } else {
-      cat->model_type = sequential;
+      cat->model.type = sequential;
     }
 
     if( !fgets(buf, MAGIC_BUFSIZE, input) ||
@@ -931,10 +975,16 @@ error_code_t load_category_header(FILE *input, category_t *cat) {
 
     if( !fgets(buf, MAGIC_BUFSIZE, input) ||
 	(sscanf(buf, MAGIC8_i, 
-		&cat->shannon,
-		&cat->alpha, &cat->beta,
-		&cat->mu, &cat->s2) < 5) ) {
+		&cat->shannon, &cat->shannon_s2) < 2) ) {
       errormsg(E_ERROR, "bad category file [8]\n");
+      return 0;
+    }
+
+    if( !fgets(buf, MAGIC_BUFSIZE, input) ||
+	(sscanf(buf, MAGIC10_i, 
+		&cat->alpha, &cat->beta,
+		&cat->mu, &cat->s2) < 4) ) {
+      errormsg(E_ERROR, "bad category file [10]\n");
       return 0;
     }
 
@@ -948,8 +998,10 @@ error_code_t load_category_header(FILE *input, category_t *cat) {
 	cat->retype |= (1<<load_regex(buf + RESTARTPOS));
 
       } else if( strncmp(buf, MAGIC4_i, 10) == 0) {
-	if( sscanf(buf, MAGIC4_i, &lint_val1, scratchbuf) == 2 ) {
-	  cat->m_options = (options_t)lint_val1;
+	if( sscanf(buf, MAGIC4_i, &lint_val1, &shint_val, &shint_val2, scratchbuf) == 4 ) {
+	  cat->model.options = (options_t)lint_val1;
+	  cat->model.cp = (charparser_t)shint_val;
+	  cat->model.dt = (digtype_t)shint_val2;
 	}
       }
 
@@ -959,22 +1011,18 @@ error_code_t load_category_header(FILE *input, category_t *cat) {
     /* if this category did not register a regex, it wants
        the default processing, so we flag this */
     if( !cat->retype ) {
-      cat->m_options |= (1<<M_OPTION_USE_STDTOK);
+      cat->model.options |= (1<<M_OPTION_USE_STDTOK);
     }
 
     /* if we haven't read a character class, use alpha */
-    if( !(cat->m_options & (1<<M_OPTION_CHAR_ALPHA)) &&
-	!(cat->m_options & (1<<M_OPTION_CHAR_ALNUM)) &&
-	!(cat->m_options & (1<<M_OPTION_CHAR_CEF)) &&
-	!(cat->m_options & (1<<M_OPTION_CHAR_CHAR)) &&
-	!(cat->m_options & (1<<M_OPTION_CHAR_ADP)) &&
-	!(cat->m_options & (1<<M_OPTION_CHAR_GRAPH)) ) {
-      if( cat->m_options & (1<<M_OPTION_MBOX_FORMAT) ) {
-	cat->m_options |= (1<<M_OPTION_CHAR_ADP);
+    if( cat->model.cp == CP_DEFAULT ) {
+      if( cat->model.options & (1<<M_OPTION_MBOX_FORMAT) ) {
+	cat->model.cp = CP_ADP;
       } else {
-	cat->m_options |= (1<<M_OPTION_CHAR_ALPHA);
+	cat->model.cp = CP_ALPHA;
       }
     }
+
     /* if we're here, success! */
     return 1;
   }
@@ -1053,7 +1101,7 @@ error_code_t reload_category(category_t *cat) {
     /* free the hash, but keep the cat->fullfilename */
     free_category_hash(cat);
     return load_category(cat) && 
-      sanitize_model_options(&m_options,cat);
+      sanitize_model_options(&m_options,&m_cp,cat);
   }
   return 0;
 }

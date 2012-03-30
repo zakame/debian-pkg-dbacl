@@ -1,3 +1,4 @@
+datarootdir ?= $(prefix)/share
 documentationdir = $(pkgdatadir)/testsuite
 documentation_SCRIPTS = dbaclA dbaclB dbaclC dbaclL \
 	ifile \

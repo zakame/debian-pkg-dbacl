@@ -1,5 +1,7 @@
 AUTOMAKE_OPTIONS = 1.4 gnits
 ACLOCAL = -I ../../config
+datarootdir ?= $(prefix)/share
+
 
 BTESTS = dbacl-V.sh \
 	bayesol-V.sh \
@@ -13,10 +15,14 @@ LTESTS = dbacl-l.sh \
 	dbacl-graph.sh \
 	dbacl-cef.sh \
 	dbacl-adp.sh \
+	dbacl-cef2.sh \
 	dbacl-g.sh \
 	dbacl-jap.sh \
 	dbacl-a.sh \
-	dbacl-o.sh
+	dbacl-o.sh \
+	dbacl-O.sh \
+	dbacl-z.sh \
+	dbacl-zo.sh
 
 MLTESTS = html.sh html-links.sh html-alt.sh \
 	xml.sh 
@@ -76,8 +82,9 @@ check_SCRIPTS = $(BTESTS) $(LTESTS) $(MLTESTS) $(EMTESTS) $(CTESTS) $(HTESTS)
 EXTRA_DIST = dbacl-V.shin bayesol-V.shin mailinspect-V.shin \
 	dbacl-l.shin dbacl-j.shin dbacl-w3.shin \
 	dbacl-alpha.shin dbacl-alnum.shin dbacl-graph.shin \
-	dbacl-cef.shin dbacl-adp.shin dbacl-g.shin dbacl-jap.shin \
-	dbacl-a.shin dbacl-o.shin \
+	dbacl-cef.shin dbacl-adp.shin dbacl-cef2.shin \
+	dbacl-g.shin dbacl-jap.shin \
+	dbacl-a.shin dbacl-o.shin dbacl-O.shin dbacl-z.shin dbacl-zo.shin \
 	html.shin html-links.shin html-alt.shin \
 	xml.shin \
 	email-mbox.shin email-maildir.shin \

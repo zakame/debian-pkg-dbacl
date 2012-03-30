@@ -465,7 +465,7 @@ as root:
 A real chess engine that works with XBoard must implement the
 <a href="http://www.tim-mann.org/xboard/engine-intf.html">Chess Engine
 Communication Protocol</a>. This is a bit tedious, so I prepared one earlier.
-Save it as a file named <a href="dce-basic.sh">dce-basic.sh</a> in your <i>chess</i>
+Save it as a file named <a href="chess/dce-basic.sh">dce-basic.sh</a> in your <i>chess</i>
 directory, or type it yourself from the listing below.
  Note that I've just created enough code to play a simple game
 without undo, force, switch sides or board setup. In other words, the only
@@ -633,14 +633,14 @@ with XBoard yourself, so I won't say what happens next or how well
 <i>dbacl</i> does as a chess player. The discussion with answers continues
 in the next section so consider this a spoiler warning. Don't peek!
 <p>
-When playing chess on XBoard, don't forget that <a href="dce-basic.sh">dce-basic.sh</a> is
+When playing chess on XBoard, don't forget that <a href="chess/dce-basic.sh">dce-basic.sh</a> is
 incomplete. All you can do is play White, and restart the game whenever
 you want. No fancy menu choices. However, you can follow what's going
 on at any time by looking at the temporary files named 
 <i>dce-basic.current.*</i> which are placed in your <i>chess</i> directory.
 <p>
-<img src="down.png"><p>
-<img src="spoiler.png" alt="spoiler space" height="100%">
+<img src="chess/down.png"><p>
+<img src="chess/spoiler.png" alt="spoiler space" height="100%">
 <p>
 <h2>First steps</h2>
 <p>
@@ -685,8 +685,8 @@ mindful of this when you experiment.
 </pre>
 <p>
 <p>
-<img src="down.png"><p>
-<img src="spoiler.png" alt="spoiler space" height="100%">
+<img src="chess/down.png"><p>
+<img src="chess/spoiler.png" alt="spoiler space" height="100%">
 <p>
 <h2>Several steps</h2>
 <p>
@@ -762,8 +762,8 @@ let's make a proper check:
 % xboard -fcp ./dce-basic.sh
 </pre>
 <p>
-<img src="down.png"><p>
-<img src="spoiler.png" alt="spoiler space" height="100%">
+<img src="chess/down.png"><p>
+<img src="chess/spoiler.png" alt="spoiler space" height="100%">
 <p>
 <h2>Another improvement</h2>
 <p>
@@ -791,7 +791,7 @@ to base our models on full moves? Since our engine always plays
 Black, then the completed gamelines will always have an even number of
 words. Moreover, the '-w 7" model shall truly be <i>seven chess moves</i> long, not three
 and a half. Let's try it. We can combine pairs of moves by replacing the
-space between them with underscores as follows (<a href="combine_half_moves.sh">combine_half_moves.sh</a>).
+space between them with underscores as follows (<a href="chess/combine_half_moves.sh">combine_half_moves.sh</a>).
 <pre>
 % cat test.gameline
 e4 c5 Nf3 e6 d3 Nc6
@@ -804,7 +804,7 @@ e4_c5 Nf3_e6 d3_Nc6
 </pre>
 <p>
 Now we have to adapt the training sets, and change the code of <i>dce-basic.sh</i>
-slightly. I've called this modification <a href="dce-1.sh">dce-1.sh</a>
+slightly. I've called this modification <a href="chess/dce-1.sh">dce-1.sh</a>
 <pre>
 % cd gamefiles
 % cat BlackWinDraw.txt | ../combine_half_moves.sh > BlackWinDraw-1.txt
@@ -835,8 +835,8 @@ Okay, it seems to be working.
 % xboard -fcp ./dce-1.sh
 </pre>
 <p>
-<img src="down.png"><p>
-<img src="spoiler.png" alt="spoiler space" height="100%">
+<img src="chess/down.png"><p>
+<img src="chess/spoiler.png" alt="spoiler space" height="100%">
 <p>
 <h2>Aimless behaviour</h2>
 <p>
@@ -959,16 +959,16 @@ In spam filters, a keyword rule typically stops all other tests from happening a
 all the capturing moves if there are any, and use the best one regardless of other options.
 It's only if there are no capturing moves that we look at the remaining possibilities.
 <p>
-By using the explanations above, you can modify <a href="dce-1.sh">dce-basic.sh</a> yourself, or try
-out <a href="dce-2.sh">dce-2.sh</a>, which implements both the 'x' and "underscore" tricks together.
+By using the explanations above, you can modify <a href="chess/dce-1.sh">dce-basic.sh</a> yourself, or try
+out <a href="chess/dce-2.sh">dce-2.sh</a>, which implements both the 'x' and "underscore" tricks together.
 <pre>
 % chmod +x dce-2.sh
 % xboard -fcp ./dce-2.sh
 </pre>
 
 <p>
-<img src="down.png"><p>
-<img src="spoiler.png" alt="spoiler space" height="100%">
+<img src="chess/down.png"><p>
+<img src="chess/spoiler.png" alt="spoiler space" height="100%">
 <p>
 <h2>Tactical adjustments</h2>
 <p>
@@ -1008,7 +1008,7 @@ As capture rules become heavier and more complex, the original patterns learned 
 <i>dbacl</i> from the training games lose their importance. The <i>dbacl</i> chess engine becomes
 a hybrid, part ordinary chess engine and part Bayesian text classifier.
 <p>
-I've implemented the two rules above in <a href="dce-3.sh">dce-3.sh</a>. Try it out now.
+I've implemented the two rules above in <a href="chess/dce-3.sh">dce-3.sh</a>. Try it out now.
 <pre>
 % chmod +x dce-3.sh
 % xboard -fcp ./dce-3.sh
@@ -1017,8 +1017,8 @@ I've implemented the two rules above in <a href="dce-3.sh">dce-3.sh</a>. Try it 
 <!-- not finished, but doesn't look promising 
 
 <p>
-<img src="down.png"><p>
-<img src="spoiler.png" alt="spoiler space" height="100%">
+<img src="chess/down.png"><p>
+<img src="chess/spoiler.png" alt="spoiler space" height="100%">
 <p>
 <h2>The carrot and the stick</h2>
 <p>
@@ -1095,8 +1095,8 @@ which implements all these changes.
 //-->
 
 <p>
-<img src="down.png"><p>
-<img src="spoiler.png" alt="spoiler space" height="100%">
+<img src="chess/down.png"><p>
+<img src="chess/spoiler.png" alt="spoiler space" height="100%">
 <p>
 <h2>Randomized play</h2>
 <p>
@@ -1105,11 +1105,11 @@ We've come a long way, so let's go back to the initial question.
 we need at least one example which can't be explained by random play.
 While <i>dbacl</i> undoubtedly makes some strange chess decisions sometimes,
 let's look at the following game fragment played against 
-<a href="dce-3.sh">dce-3.sh</a>:
+<a href="chess/dce-3.sh">dce-3.sh</a>:
 <p>
-<img src="csfpc1.png">
-<img src="csfpc2.png">
-<img src="csfpc3.png">
+<img src="chess/csfpc1.png">
+<img src="chess/csfpc2.png">
+<img src="chess/csfpc3.png">
 <p>
 Clearly, <i>dbacl</i> picked up the pawn defensive moves from the games archive,
 as this succession of moves is very unlikely to be random (all moves are on
@@ -1207,7 +1207,7 @@ WhiteWinDraw  47.56 e4 c5 Nf3 e6 d3 Nc6 d4
 <p>
 Awk's randomizer is seeded by the time of day, so if you repeatedly run the <i>randomizer.awk</i> script in a fast loop, it will always output the same result. But for chess against people, we don't really care about the quality of the randomness involved.
 <p>
-I've added the randomizer to the final version of the chess engine, <a href="dce.sh">dce.sh</a>, which also contains a few other improvements. If you feel
+I've added the randomizer to the final version of the chess engine, <a href="chess/dce.sh">dce.sh</a>, which also contains a few other improvements. If you feel
 like experimenting further with the <i>dbacl</i> chess engine, that script is probably
 the best starting point. Enjoy!
 <pre>
@@ -1215,8 +1215,8 @@ the best starting point. Enjoy!
 % xboard -fcp ./dce.sh
 </pre>
 <p>
-<img src="down.png"><p>
-<img src="spoiler.png" alt="spoiler space" height="100%">
+<img src="chess/down.png"><p>
+<img src="chess/spoiler.png" alt="spoiler space" height="100%">
 <p>
 <h2>Wrapping up</h2>
 <p>
@@ -1254,7 +1254,7 @@ failures are almost entirely based on the historical record of the
 game as it develops and mimicry of training games, not at all on calculating moves and
 countermoves in the future.
 <p>
-Download the latest dbacl chess engine: <a href="dce.sh">dce.sh</a>
+Download the latest dbacl chess engine: <a href="chess/dce.sh">dce.sh</a>
 <p>
 <h2>Post Scriptum</h2>
 <p>

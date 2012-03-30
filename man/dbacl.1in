@@ -26,12 +26,16 @@ dbacl \- a digramic Bayesian classifier for text recognition.
 .IR online ]
 [-L
 .IR measure ]
+[-z
+.IR ftresh ]
+[-O
+.IR ronline ]...
 [-g
 .IR regex ]...
 [FILE]...
 .HP
 .B dbacl
-[-vnimNRX] [-h
+[-vnimNRXYP] [-h
 .IR size ]
 [-T
 .IR type]
@@ -89,7 +93,7 @@ token here is either a word (fragment) or a combination of words
 (fragments), selected according to various switches. Learning roughly
 works by tweaking token probabilities until the training data is least
 surprising.
-.SH EXIT STATUS
+.SH EXIT_STATUS
 The normal shell exit conventions aren't followed (sorry!). When using the
 .B -l
 command form,
@@ -257,36 +261,63 @@ file operations are designed to be atomic.
 .PP
 Finally, note that
 .B dbacl
-does not manage your document corpora or your computed categories,
-and in particular it does not
-allow you to extend an existing category file with new documents.
-This is unlike various current spam filters, which can learn new
-emails incrementally. This limitation of
+does not manage your document corpora or your computed categories.
+In particular, 
 .B dbacl
-is partially due to the
-nonlinear procedure used in the learning algorithm, and partially a
-desire for increased flexibility.
-.PP
-You can simulate the effect of incremental learning by saving your
-training documents into archives and adding to these archives over
-time, relearning from scratch periodically. Learning is actually
-faster if these archives are compressed and decompressed on the fly
-when needed. By keeping control of your
+cannot add or subtract a document from a category file directly.
+If you want to learn a category incrementally, the standard way
+is to keep adding to your document corpus, and learn the whole corpus
+each time. By keeping control of your
 archives, you can never lose the information in your categories, and
 you can easily experiment with different switches or tokenizations or
 sets of training documents if you like.
-.SH SECONDARY SWITCHES
+.PP
+If the standard incremental learning method is too slow, the
+.B -o
+switch can help. This creates a data file named 
+.IR online
+which contains all
+the document statistics that have been learned. When you use the
+.B -l
+and
+.B -o
+switches together, dbacl merges the 
+.IR online
+data file (if it exists) 
+with the new document(s) to be learned, and recreates an updated
+version of
+.IR online .
+This is equivalent to adding the new documents to the
+corpus and relearning the whole corpus, but faster. However, documents
+cannot be removed if you change your mind. This is a limitation of 
+dbacl which cannot be changed for mathematical reasons. You can work around 
+this by making backups of the 
+.IR online
+data file. It is also possible to merge
+one or more extra
+.IR online
+data files simultaneously by using the 
+.B -O
+switch one or more times.
+.SH SECONDARY_SWITCHES
 .PP
 By default,
 .B dbacl
-classifies the input text as a whole. However, when using the
-.B -f
-option,
+classifies the input text as a whole, ie it only outputs a single result even if
+you specify several input files. If you want to classify multiple input files 
+you can either call
 .B dbacl
-can be used to filter each input line separately, printing only those
+repeatedly (which is fast when you use the 
+.B -m
+switch), or use the
+.BR -F
+switch, which prints each input FILE followed by the result for that FILE.
+Alternatively, you can classify each line of the input individually, by using the
+.B -f
+option, which prints only those
 lines which match one or more models identified by
 .I keep
-(use the category name or number to refer to a category). This is useful if you
+(use the category name or number to refer to a category). This last switch is useful if you
 want to filter out some lines, but note that if the lines are short, then
 the error rate can be high.
 .PP
@@ -527,7 +558,9 @@ process will write a lasting category and memory dump. The
 .B -m
 switch can also speed up online learning, but beware of possible corruption.
 Only one process should read or write a file. This option is intended
-primarily for controlled test runs.
+primarily for controlled test runs. See also the
+.B -O
+(big-oh) switch.
 .IP -r
 Learn the digramic reference model only. Skips the learning of extra features in
 the text corpus.
@@ -567,6 +600,10 @@ When the type is not "email" (eg "text"), then individual input features
 are added with probability 2^(\fI-decim\fP). When the type is "email", then
 full input messages are added with probability 2^(\fI-decim\fP).
 Within each such message, all features are used.
+.IP -z
+When learning, only take into account features whose occurrence count is strictly greater than ftreshold. By default, ftreshold is zero, so all features in the 
+training corpus are used. A negative value of ftreshold causes dbacl to subtract
+from the maximum observed feature count, and to use that if it is positive. For example, -z 1 means dbacl only learns features which occur at least twice in the corpus, and -z -5 means dbacl only learns the feature(s) whose occurrence count is within 4 of the global maximum.
 .IP -A
 Expect indented input and scores. With this switch,
 .B dbacl
@@ -585,6 +622,10 @@ input line.
 .IP -D
 Print debug output. Do not use normally, but can be very useful for
 displaying the list features picked up while learning.
+.IP -F
+For each FILE of input, print the FILE name followed by the classification result (normally
+.B dbacl
+only prints a single result even if multiple files are listed as input).
 .IP -H
 Allow hash table to grow up to a maximum of 2^\fIgsize\fP elements during learning. Initial size is given by
 .B -h
@@ -604,11 +645,30 @@ In conjunction with the
 .B -f
 option, stops filtering but prints each input line prepended with a summary of the
 posterior distribution for that line.
+.IP -O
+This switch causes the online data file named 
+.IR ronline
+to be merged during
+learning. The 
+.IR ronline
+file must be created using the -o (little-oh) switch. 
+Several -O data files can be merged simultaneously. This is intended to be
+a read only version of -o, to allow piecing together of several sets of preparsed
+data. See the description of the -o switch.
 .IP -R
 Include an extra category for purely random text. The category is called "random".
 Only makes sense when using the
 .B -c
 option.
+.IP -P
+Correct the category scores to include estimated prior
+probabilities. The prior probability estimate for each category is
+proportional to the number of documents or, if that doesn't make
+sense, the number of unique features. This can help with "balancing" when one
+category is learned from much more data than another. If all
+categories are learned from approximately the same amount of data (or
+maybe within a factor of 2), then this option should have little
+qualitative effect.
 .IP -S
 Enable line straddling. This is useful together with the
 .B -w
@@ -699,6 +759,35 @@ switch alone, factorizes the score as the empirical divergence plus the shannon 
 .B -X
 switch is not supported in all possible models, and displays a percentage of "0.0" if it can't be calculated. Note that for unknown documents, it is quite common
 to have confidences close to zero.
+.IP -Y
+Print the cumulative media counts. Some tokenizers include a medium variable with
+each token: for example, in email classification the word "the" can appear in the
+subject or the body of a message, but the subject is counted as a separate medium
+from the body. This allows the token frequencies to be kept separate, even though
+the word is the same. Currently, up to 16 different media are supported (0-15),
+with the following interpretation for email:
+
+ 0	unused.
+ 1	default medium.
+ 2	mail body or attachment in HTML format.
+ 3	mail body or attachment in plain text format.
+ 4	mail header unknown.
+ 5	User-Agent, Comments, Keywords, Note
+ 6	X-MS*, Categor*, Priority, Importance, Thread-*
+ 7	X-*
+ 8	List-*
+ 9	MIME-Version, Content-*
+ 10	Subject
+ 11	To
+ 12	Sender, Sent, BCC, CC, From
+ 13	Resent-*, Original-*
+ 14	Message-ID, References, In-Reply-To
+ 15	Received, Return-Path, Return-Receipt-To, Reply-To
+
+The 
+.B -Y
+switch prints the number of tokens observed in each separate medium, in order from
+0 to 15.
 .SH USAGE
 .PP
 To create two category files in the current directory from two

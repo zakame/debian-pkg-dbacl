@@ -1,6 +1,11 @@
 #!/bin/sh
 W=$PWD
 
+. $W/share/dbacl/TREC/OPTIONS
+if [ -n "$AUDITCOMMAND" ]; then
+    "$AUDITCOMMAND" finalize
+fi
+
 if ! cmp -s $W/stderr.log $W/share/dbacl/TREC/verify-stderr ; then
     echo "There were errors during the simulation. See stderr.log below:"
     cat $W/stderr.log
@@ -16,6 +21,5 @@ for f in ham spam ; do
 	
 	echo -e "$SIZ\thas learned $DOCS documents,\t$TOKS tokens."
 done
-
 
 exit 0

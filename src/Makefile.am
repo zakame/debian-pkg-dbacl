@@ -1,11 +1,13 @@
 # note . occurs before tests
 SUBDIRS = . tests
 
-bin_PROGRAMS = dbacl bayesol mailinspect hmine hypex
+bin_PROGRAMS = dbacl bayesol mailinspect hmine hypex 
 bin_SCRIPTS = mailcross mailtoe mailfoot
 
 PUBDOM = jenkins.c jenkins2.c \
 	mconf.h mtherr.c igam.c gamma.c const.c polevl.c isnan.c ndtr.c
+
+datarootdir ?= $(prefix)/share
 
 dbacl_SOURCES = dbacl.c dbacl.h fram.c catfun.c fh.c util.c util.h probs.c $(PUBDOM)
 dbacl_LDADD = mb.o wc.o
@@ -22,6 +24,9 @@ EXTRA_mailinspect_SOURCES = mbw.h mbw.c
 hmine_SOURCES = hmine.c hmine.h hparse.c fram.c util.h util.c dbacl.h rfc822.c rfc2822.c $(PUBDOM)
 
 hypex_SOURCES = hypex.c hypex.h dbacl.h fram.c catfun.c util.h util.c probs.c $(PUBDOM)
+
+# stuff_SOURCES = stuff.c stuff.h fram.c stuff-lexer.l stuff-parser.y stuff-parser.h probs.c util.c util.h $(PUBDOM)
+# stuff_LDADD = @LEXLIB@
 
 AM_CFLAGS = -funsigned-char -Wall -pedantic $(CFLAGSIEEE) -O3
 AM_YFLAGS = -d

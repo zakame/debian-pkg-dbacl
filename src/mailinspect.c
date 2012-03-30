@@ -3,7 +3,7 @@
  *  
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
+ * the Free Software Foundation; either version 3 of the License, or
  * (at your option) any later version.
  * 
  * This program is distributed in the hope that it will be useful,
@@ -13,7 +13,7 @@
  * 
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA.
  * 
  * Author:   Laird Breyer <laird@lbreyer.com>
  */
@@ -102,6 +102,7 @@ extern int optind, opterr, optopt;
 
 extern options_t u_options;
 extern options_t m_options;
+extern charparser_t m_cp;
 extern char *extn;
 
 extern char *progname;
@@ -821,7 +822,7 @@ void interactive_categorize() {
       if( load_category(&cat[1]) && 
 	  (input = fopen(emails.filename, "rb")) ) {
 
-	sanitize_model_options(&m_options, &cat[1]);
+	sanitize_model_options(&m_options, &m_cp, &cat[1]);
 	ephemeral_message("Please wait, recalculating scores");
 	/* loaded category successfully, now free old resources */
 	free_category(&cat[0]);
@@ -1366,7 +1367,7 @@ int main(int argc, char **argv) {
 		  "could not load category %s\n", 
 		  cat[cat_count].fullfilename);
 	}
-	sanitize_model_options(&m_options, &cat[cat_count]);
+	sanitize_model_options(&m_options, &m_cp, &cat[cat_count]);
 	cat_count++;
       }
       break;

@@ -11,6 +11,8 @@ EXTRA_DIST = bootstrap
 
 SUBDIRS = doc src man ts TREC contrib
 
+# fix for new auto{conf,make} behaviour ???
+datarootdir ?= $(prefix)/share
 dist-hook:
 	(cd $(distdir) && mkdir -p config)
 	for f in $(AUX_DIST); do \

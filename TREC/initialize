@@ -34,4 +34,7 @@ else
     exit 1
 fi
 
-exit 0
+# return success if dbacl was properly installed 
+# (ie compiled version is identical to installed version)
+EXE=`ls dbacl-*/src/dbacl | head -1`
+cmp $EXE "bin/dbacl"

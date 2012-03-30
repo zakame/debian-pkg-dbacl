@@ -3,7 +3,7 @@
  *  
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
+ * the Free Software Foundation; either version 3 of the License, or
  * (at your option) any later version.
  * 
  * This program is distributed in the hope that it will be useful,
@@ -13,7 +13,7 @@
  * 
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA.
  * 
  * Author:   Laird Breyer <laird@lbreyer.com>
  */
@@ -306,6 +306,7 @@ void reset_xml_character_filter(XML_State *xml, XML_Reset reset) {
 void reset_mbox_line_filter(MBOX_State *mbox) {
   mbox->state = msUNDEF;
   mbox->substate = msuUNDEF;
+  mbox->hid = hidUNDEF;
   mbox->header.type = mbox->body.type = ctUNDEF;
   mbox->header.encoding = mbox->body.encoding = ceUNDEF;
   mbox->prev_line_empty = 1;
@@ -345,60 +346,134 @@ void free_mbox_line_filter(MBOX_State *mbox) {
   }
 }
 
-/* the token class is a common label for a subset of features,
-   such as e.g. all features which appear in the header. The label
-   should be a number greater than AMIN. If all tokens have the same
-   class, then we effectively obtain the dbacl 1.7 and earlier behaviour. 
-   IT DOESN"T MAKE SENSE to have multiple classes and multiple orders.
-   It's one or the other, otherwise we need several normalizing constants. 
+
+token_class_t getclass_dbacl1_7pre(MBOX_State *mbox) {
+  return 1;
+}
+
+token_class_t getclass_dbacl1_12pre(MBOX_State *mbox) {
+  switch(mbox->state) {
+  case msHEADER:
+    switch(mbox->hstate) {
+    case mhsTRACE:
+      return 9;
+    case mhsFROM:
+      return 8;
+    case mhsTO:
+      return 7;
+    case mhsSUBJECT:
+      return 6;
+    case mhsXHEADER:
+      return 5;
+    default:
+    case mhsUNDEF:
+      return 4;
+    }
+  case msUNDEF:
+  case msBODY:
+    return 3;
+  case msATTACH:
+    return 2;
+  default:
+    return 1;
+  }
+  return 0;
+}
+
+/* note: the token_class_t has a practical range of 0-15, because 
+   it is represented as a 4 bit integer in token_type_t. The class
+   returned by this function is concatenated with the token before
+   hashing, so two identical tokens with different classes are different.
+   Note that for some headers it makes sense to use the same class, eg
+   for Message-ID: and References: */
+token_class_t getclass_dbacl1_13post(MBOX_State *mbox) {
+  switch(mbox->state) {
+  case msHEADER:
+    switch(mbox->hid) {
+    case hidCONTINUATION:
+      /* we should never be here, because the parser should have 
+	 filled in the correct value already */
+      return 0;
+    case hidRECEIVED: 
+    case hidRETURN_PATH: 
+    case hidRETURN_RECEIPT_TO: 
+    case hidREPLY_TO:
+      return 15;
+    case hidMESSAGE_ID: 
+    case hidREFERENCES: 
+    case hidIN_REPLY_TO:
+      return 14;
+    case hidRESENT_: 
+    case hidORIGINAL_:
+      return 13;
+    case hidFROM: 
+    case hidCC: 
+    case hidBCC: 
+    case hidSENT: 
+    case hidSENDER:
+      return 12;
+    case hidTO:
+      return 11;
+    case hidSUBJECT:
+      return 10;
+    case hidCONTENT_: 
+    case hidMIME_VERSION:
+      return 9;
+    case hidLIST_:
+      return 8;
+    case hidX_:
+      return 7;
+    case hidX_MS: 
+    case hidCATEGORY: 
+    case hidPRIORITY: 
+    case hidIMPORTANCE: 
+    case hidTHREAD_:
+      return 6;
+    case hidUSER_AGENT: 
+    case hidCOMMENTS: 
+    case hidKEYWORDS: 
+    case hidNOTE:
+      return 5;
+    case hidUNDEF:
+    default:
+      return 4;
+    }
+  case msBODY:
+  case msATTACH:
+  default:
+    switch(mbox->body.type) {
+    case ctTEXT_PLAIN: 
+    case ctUNDEF: 
+    case ctTEXT_UNKNOWN:
+      return 3;
+    case ctTEXT_RICH: 
+    case ctTEXT_HTML: 
+    case ctTEXT_XML: 
+    case ctTEXT_SGML:
+      return 2;
+    default:
+      return 1;
+    }
+  }
+  return 0;
+}
+
+
+/* the token class is a common label for a subset of features, such as
+   e.g. all features which appear in one header. If all tokens have
+   the same class, then we effectively obtain the dbacl 1.7 and
+   earlier behaviour.  IT DOESN"T MAKE SENSE to have multiple classes
+   and multiple orders.  It's one or the other, otherwise we need
+   several normalizing constants.
 */
 token_type_t get_token_type(token_order_t o) {
   token_type_t tt;
   tt.order = o;
   tt.mark = 0;
-
-  if( (m_options & (1<<M_OPTION_MBOX_FORMAT)) &&
-      !(m_options & (1<<M_OPTION_NGRAM_STRADDLE_NL)) ) {
-    switch(mbox.state) {
-    case msHEADER:
-      switch(mbox.hstate) {
-      case mhsTRACE:
-	tt.cls = AMIN + 9;
-	break;
-      case mhsFROM:
-	tt.cls = AMIN + 8;
-	break;
-      case mhsTO:
-	tt.cls = AMIN + 7;
-	break;
-      case mhsSUBJECT:
-	tt.cls = AMIN + 6;
-	break;
-      case mhsXHEADER:
-	tt.cls = AMIN + 5;
-	break;
-      default:
-      case mhsUNDEF:
-	tt.cls = AMIN + 4;
-	break;
-      }
-      break;
-    case msUNDEF:
-      tt.cls = AMIN + 3;
-      break;
-    case msBODY:
-      tt.cls = AMIN + 3;
-      break;
-    case msATTACH:
-      tt.cls =  AMIN + 2;
-      break;
-    default:
-      tt.cls = AMIN + 1;
-    }
-  } else {
-    tt.cls = AMIN + 1;
-  }
-
+  tt.cls = (( (m_options & (1<<M_OPTION_MBOX_FORMAT)) &&
+	      !(m_options & (1<<M_OPTION_NGRAM_STRADDLE_NL)) ) ?
+	    getclass_dbacl1_13post(&mbox) :
+	    1);
   return tt;
 }
 
@@ -425,7 +500,8 @@ void process_directory(char *name,
 		       void (*character_filter)(XML_State *, char *), 
 		       void (*word_fun)(char *, token_type_t, regex_count_t), 
 		       char *(*pre_line_fun)(char *),
-		       void (*post_line_fun)(char *)) {
+		       void (*post_line_fun)(char *),
+		       void (*post_file_fun)(char *)) {
   DIR *d;
   struct dirent *sd;
   FILE *input;
@@ -438,7 +514,9 @@ void process_directory(char *name,
     /* directory returns relative file names, but we need full paths */
     strcpy(fullp, name);
     fp = fullp + strlen(name); 
-    *fp++ = '/';
+    if( (fp > fullp) && (fp[-1] != '/') ) {
+      *fp++ = '/';
+    }
 
     for(sd = readdir(d); sd; sd = readdir(d)) {
       strcpy(fp, sd->d_name);
@@ -458,6 +536,9 @@ void process_directory(char *name,
 	    process_file(input, line_filter, character_filter, 
 			 word_fun, pre_line_fun, post_line_fun);
 	    fclose(input);
+
+	    if( post_file_fun ) { (*post_file_fun)(fullp); }
+
 	  }
 	default:
 	  /* nothing */
@@ -490,9 +571,8 @@ void process_file(FILE *input,
   char tokbuf[(MAX_TOKEN_LEN+1)*MAX_SUBMATCH+EXTRA_TOKEN_LEN];
   char *q;
   token_order_t how_many;
-  long int e;
   int extra_lines = 2;
-  e = 0;
+
   /* initialize the norex state */
   reset_current_token(tokbuf, &q, &how_many);
 
@@ -581,7 +661,8 @@ void w_process_directory(char *name,
 			 void (*w_character_filter)(XML_State *, wchar_t *), 
 			 void (*word_fun)(char *, token_type_t, regex_count_t), 
 			 char *(*pre_line_fun)(char *),
-			 void (*post_line_fun)(char *)) {
+			 void (*post_line_fun)(char *),
+			 void (*post_file_fun)(char *)) {
   DIR *d;
   struct dirent *sd;
   FILE *input;
@@ -594,7 +675,9 @@ void w_process_directory(char *name,
     /* directory returns relative file names, but we need full paths */
     strcpy(fullp, name);
     fp = fullp + strlen(name); 
-    *fp++ = '/';
+    if( (fp > fullp) && (fp[-1] != '/') ) {
+      *fp++ = '/';
+    }
 
     for(sd = readdir(d); sd; sd = readdir(d)) {
       strcpy(fp, sd->d_name);
@@ -614,6 +697,9 @@ void w_process_directory(char *name,
 	    w_process_file(input, w_line_filter, w_character_filter, 
 			   word_fun, pre_line_fun, post_line_fun);
 	    fclose(input);
+
+	    if( post_file_fun ) { (*post_file_fun)(fullp); }
+	    
 	  }
 	default:
 	  /* nothing */

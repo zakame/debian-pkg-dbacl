@@ -3,7 +3,7 @@
  *  
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
+ * the Free Software Foundation; either version 3 of the License, or
  * (at your option) any later version.
  * 
  * This program is distributed in the hope that it will be useful,
@@ -13,7 +13,7 @@
  * 
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA.
  * 
  * Author:   Laird Breyer <laird@lbreyer.com>
  */
@@ -30,6 +30,7 @@
 
 extern options_t u_options;
 extern options_t m_options;
+extern digtype_t m_dt;
 
 extern category_t cat[MAX_CAT];
 extern category_count_t cat_count;
@@ -65,7 +66,7 @@ void integrity_check2(category_t *mycat) {
   int i,j;
   float five;
 
-  if( u_options & (1<<U_OPTION_LAPLACE) ) {
+  if( m_dt == DT_UNIFORM ) {
     five = UNPACK_DIGRAMS(PACK_DIGRAMS(-log(ASIZE - AMIN)));
 
     for(i = AMIN; i < ASIZE; i++) {
@@ -118,7 +119,7 @@ int main(int argc, char **argv) {
 	  u_options |= (1<<U_OPTION_DUMP);
 	  break;
 	case 'u':
-	  u_options |= (1<<U_OPTION_LAPLACE);
+	  m_dt = DT_UNIFORM;
 	  break;
 	default:
 	  errormsg(E_ERROR, "unrecognized option %s\n", argv[i]);
