@@ -1,3 +1,10 @@
+dbacl (1.12-3) unstable; urgency=low
+
+  * Acknowledge NMU by ryanakca, thanks (Closes: #628616)
+  * Update to dpkg-source 3.0 (quilt)
+
+ -- Zak B. Elep <zakame@zakame.net>  Fri, 30 Mar 2012 18:15:31 +0800
+
 dbacl (1.12-2.1) unstable; urgency=low
 
   * Non-maintainer upload.

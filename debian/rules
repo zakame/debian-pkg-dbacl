@@ -4,7 +4,6 @@
 # Let's use CDBS! :)
 
 include /usr/share/cdbs/1/rules/debhelper.mk
-include /usr/share/cdbs/1/rules/simple-patchsys.mk
 include /usr/share/cdbs/1/class/autotools.mk
 
 # Move installed docs to proper Debian location
