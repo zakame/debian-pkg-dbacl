@@ -1,0 +1,1604 @@
+From: "Zak B. Elep" <zakame@zakame.net>
+Date: Sat, 31 Mar 2012 23:43:19 +0800
+Subject: Fix hyphenations in manpages
+
+---
+ man/bayesol.1in     |   26 +--
+ man/dbacl.1in       |  456 +++++++++++++++++++++++++--------------------------
+ man/hmine.1in       |   10 +-
+ man/hypex.1in       |   18 +-
+ man/mailcross.1in   |   28 ++--
+ man/mailinspect.1in |   60 +++----
+ 6 files changed, 299 insertions(+), 299 deletions(-)
+
+diff --git a/man/bayesol.1in b/man/bayesol.1in
+index 83f5201..405d55d 100644
+--- a/man/bayesol.1in
++++ b/man/bayesol.1in
+@@ -5,12 +5,12 @@ bayesol \- a Bayes solution calculator for use with dbacl.
+ .SH SYNOPSIS
+ .HP
+ .B bayesol
+-[-DVNniv] -c 
++[\-DVNniv] \-c 
+ .I riskspec
+ [FILE]...
+ .HP
+ .B bayesol
+--V
++\-V
+ .SH DESCRIPTION
+ .PP
+ .B bayesol
+@@ -33,18 +33,18 @@ In case of a problem,
+ .B bayesol
+ returns zero.
+ .SH OPTIONS
+-.IP -c
++.IP \-c
+ Classify using 
+ .IR riskspec . 
+ See the section RISK SPECIFICATION.
+-.IP -i
++.IP \-i
+ Fully internationalized mode. Forces the use of wide characters internally,
+ which is necessary in some locales. This incurs a noticeable performance penalty.
+-.IP -n
++.IP \-n
+ Print risk scores for each 
+ .IR category . 
+-Each score is (approximately) the logarithm of the expected risk under that category. The lowest score (ie closest to -infinity) is best, etc.
+-.IP -N
++Each score is (approximately) the logarithm of the expected risk under that category. The lowest score (ie closest to \-infinity) is best, etc.
++.IP \-N
+ Print recursive risk scores for each 
+ .IR category . 
+ Each score is (approximately) the logarithm of the best score based on
+@@ -52,15 +52,15 @@ the remaining categories, after the previously best scoring categories
+ have been removed, and a normalizing factor was added. A full
+ description is given in the technical report listed at the end of this
+ manpange. The largest score (ie closest to +infinity) is best, etc.
+-.IP -v
++.IP \-v
+ Verbose mode. Prints to STDOUT the category with minimum posterior risk.
+ In case several categories are possible, 
+ prints the first category in the order in which they appear
+ in the categories section of 
+ .IR riskpspec .
+-.IP -D
++.IP \-D
+ Print debug output. Do not use.
+-.IP -V
++.IP \-V
+ Print the program version number and exit. 
+ .SH RISK SPECIFICATION
+ .B bayesol
+@@ -112,7 +112,7 @@ are category names,
+ .IR p1 ,
+ .IR p2 , "" ...,
+ .IR pN ,
+-are non-negative numbers, 
++are non\-negative numbers, 
+ .IR regex1 ,
+ .IR regex2 , "" ...,
+ .IR regexM ,
+@@ -136,7 +136,7 @@ within FILE or STDIN, or the first row with empty regular expression if there
+ are no matches.
+ .PP
+ Each formula can be either a single number, or an algebraic combination of
+-the operators exp(), log(), +, -, *, /, ^ and parentheses (). The string "inf"
++the operators exp(), log(), +, \-, *, /, ^ and parentheses (). The string "inf"
+ is parsed as the value infinity. Also, the 
+ string "complexity" is recognized, and converted to the complexity for 
+ that category 
+@@ -158,7 +158,7 @@ is used together with
+ An invocation looks like this:
+ .PP
+ .na
+-% dbacl -c one -c two -c three sample.txt -vna | bayesol -c toy.risk -v
++% dbacl \-c one \-c two \-c three sample.txt \-vna | bayesol \-c toy.risk \-v
+ .ad
+ .PP
+ See @PKGDOCDIR@/costs.ps for a description of the algorithm used.
+diff --git a/man/dbacl.1in b/man/dbacl.1in
+index 7783e20..8abe1aa 100644
+--- a/man/dbacl.1in
++++ b/man/dbacl.1in
+@@ -5,60 +5,60 @@ dbacl \- a digramic Bayesian classifier for text recognition.
+ .SH SYNOPSIS
+ .HP
+ .B dbacl
+-[-01dvnirmwMNDXW]
+-[-T
++[\-01dvnirmwMNDXW]
++[\-T
+ .IR type
+-] -l
++] \-l
+ .I category
+-[-h
++[\-h
+ .IR size ]
+-[-H
++[\-H
+ .IR gsize ]
+-[-x
++[\-x
+ .IR decim ]
+-[-q
++[\-q
+ .IR quality ]
+-[-w
++[\-w
+ .IR max_order ]
+-[-e
++[\-e
+ .IR deftok ]
+-[-o
++[\-o
+ .IR online ]
+-[-L
++[\-L
+ .IR measure ]
+-[-z
++[\-z
+ .IR ftresh ]
+-[-O
++[\-O
+ .IR ronline ]...
+-[-g
++[\-g
+ .IR regex ]...
+ [FILE]...
+ .HP
+ .B dbacl
+-[-vnimNRXYP] [-h
++[\-vnimNRXYP] [\-h
+ .IR size ]
+-[-T
++[\-T
+ .IR type]
+--c
++\-c
+ .I category
+-[-c
++[\-c
+ .IR category ]...
+-[-f
++[\-f
+ .IR keep ]...
+ [FILE]...
+ .HP
+ .B dbacl
+--V
++\-V
+ .SH OVERVIEW
+ .PP
+ .B dbacl
+ is a Bayesian text and email classifier. When using the
+-.B -l
++.B \-l
+ switch, it learns a body of text
+ and produce a file named
+ .I category
+ which summarizes the text. When using the
+-.B -c
++.B \-c
+ switch, it compares an input text stream with any number of
+ .I category
+ files, and outputs the name of the closest match, or optionally
+@@ -95,11 +95,11 @@ works by tweaking token probabilities until the training data is least
+ surprising.
+ .SH EXIT_STATUS
+ The normal shell exit conventions aren't followed (sorry!). When using the
+-.B -l
++.B \-l
+ command form,
+ .B dbacl
+ returns zero on success, nonzero if an error occurs. When using the
+-.B -c
++.B \-c
+ form,
+ .B dbacl
+ returns a positive integer corresponding to the
+@@ -110,7 +110,7 @@ returns zero.
+ .SH DESCRIPTION
+ .PP
+ When using the
+-.B -l
++.B \-l
+ command form,
+ .B dbacl
+ learns a category when given one or more FILE names, which should contain readable
+@@ -130,18 +130,18 @@ The input text for learning is assumed to be unstructured plain text
+ by default. This is not suitable for learning email, because email contains
+ various transport encodings and formatting instructions which can reduce
+ classification effectiveness. You must use the
+-.B -T
++.B \-T
+ switch in that case so that
+ .B dbacl
+ knows it should perform decoding and filtering of MIME and HTML as appropriate.
+-Apropriate switch values are "-T email" for RFC2822 email input, "-T html"
+-for HTML input, "-T xml" for generic XML style input and "-T text" is the
++Apropriate switch values are "\-T email" for RFC2822 email input, "\-T html"
++for HTML input, "\-T xml" for generic XML style input and "\-T text" is the
+ default plain text format. There are other values of the
+-.B -T
++.B \-T
+ switch that also allow fine tuning of the decoding capabilities.
+ .PP
+ When using the
+-.B -c
++.B \-c
+ command form,
+ .B dbacl
+ attempts to classify the text found in FILE, or STDIN if no FILE is
+@@ -158,18 +158,18 @@ always produces an exit code which can be tested.
+ .PP
+ To see an output for a classification, you must use at least one of
+ the
+-.BR -v , -U , -n , -N , -D , -d
++.BR \-v , \-U , \-n , \-N , \-D , \-d
+ switches. Sometimes, they can be used in combination to produce
+ a natural variation of their individual outputs. Sometimes,
+ .B dbacl
+ also produces warnings on STDERR if applicable.
+ .PP
+ The
+-.B -v
++.B \-v
+ switch outputs the name of the best category among all the choices given.
+ .PP
+ The
+-.B -U
++.B \-U
+ switch outputs the name of the best category followed by a confidence
+ percentage. Normally, this is the switch that you want to use. A percentage
+ of 100% means that
+@@ -180,69 +180,69 @@ how unambiguous the classification is, and can
+ be used to tag unsure classifications (e.g. if the confidence is 25% or less).
+ .PP
+ The
+-.B -N
++.B \-N
+ switch prints each category name followed by its (posterior) probability, expressed as a percentage. The percentages always sum to 100%. This is intuitive, but only valuable if the document 
+ being classified contains a handful of tokens (ten or less). In the common
+ case with many more tokens, the probabilities are always extremely close to 100% and 0%.
+ .PP
+ The
+-.B -n
++.B \-n
+ switch prints each category name followed by the negative logarithm of its
+ probability. This is equivalent to using the
+-.B -N
++.B \-N
+ switch, but much more useful. The smallest number gives the best category. A more convenient
+ form is to use both
+-.B -n
++.B \-n
+ and
+-.B -v
++.B \-v
+ which prints each category name followed by the cross entropy and the
+ number of tokens analyzed. The cross entropy measures (in bits) the average
+ compression rate which is achievable, under the given category model, per token
+ of input text. If you use all three of
+-.BR -n , -v , -X
++.BR \-n , \-v , \-X
+ then an extra value is output for each category, representing a kind
+-of p-value for each category score. This indicates how typical the
++of p\-value for each category score. This indicates how typical the
+ score is compared to the training documents, but only works if the
+-.B -X
++.B \-X
+ switch was used during learning, and only for some types of models (e.g. email).
+-These p-values are uniformly distributed and independent (if the
++These p\-values are uniformly distributed and independent (if the
+ categories are independent), so can be combined using Fisher's chi
+-squared test to obtain composite p-values for groupings of categories.
++squared test to obtain composite p\-values for groupings of categories.
+ .PP
+ The
+-.B -v
++.B \-v
+ and
+-.B -X
++.B \-X
+ switches together print each category name followed by a detailed
+ decomposition of the category score, factored into ( divergence rate +
+-shannon entropy rate )* token count @ p-value. Again, this only works in some types of models.
++shannon entropy rate )* token count @ p\-value. Again, this only works in some types of models.
+ .PP
+ The
+-.B -v
++.B \-v
+ and
+-.B -U
++.B \-U
+ switches print each category name followed by a decomposition of the
+ category score into ( divergence rate + shannon entropy rate # score
+ variance )* token count.
+ .PP
+ The
+-.B -D
++.B \-D
+ switch prints out the input text as modified internally by
+ .B dbacl
+ prior to tokenization. For example, if a MIME encoded email document is classified, then this prints the decoded text that will be actually tokenized and classified. This switch is mainly useful for debugging.
+ .PP
+ The
+-.B -d
++.B \-d
+ switch dumps tokens and scores while they are being read. It is useful
+ for debugging, or if you want to create graphical representations of the
+ classification. A detailed explanation of the output is beyond the scope
+ of this manual page, but is straightforward if you've read dbacl.ps.
+ Possible variations include
+-.B -d
++.B \-d
+ together with
+-.B -n
++.B \-n
+ or
+-.BR -N .
++.BR \-N .
+ .PP
+ Classification can be done with one or several categories in principle. When
+ two or more categories are used, the Bayesian posterior probability
+@@ -273,14 +273,14 @@ you can easily experiment with different switches or tokenizations or
+ sets of training documents if you like.
+ .PP
+ If the standard incremental learning method is too slow, the
+-.B -o
++.B \-o
+ switch can help. This creates a data file named 
+ .IR online
+ which contains all
+ the document statistics that have been learned. When you use the
+-.B -l
++.B \-l
+ and
+-.B -o
++.B \-o
+ switches together, dbacl merges the 
+ .IR online
+ data file (if it exists) 
+@@ -297,7 +297,7 @@ data file. It is also possible to merge
+ one or more extra
+ .IR online
+ data files simultaneously by using the 
+-.B -O
++.B \-O
+ switch one or more times.
+ .SH SECONDARY_SWITCHES
+ .PP
+@@ -308,12 +308,12 @@ you specify several input files. If you want to classify multiple input files
+ you can either call
+ .B dbacl
+ repeatedly (which is fast when you use the 
+-.B -m
++.B \-m
+ switch), or use the
+-.BR -F
++.BR \-F
+ switch, which prints each input FILE followed by the result for that FILE.
+ Alternatively, you can classify each line of the input individually, by using the
+-.B -f
++.B \-f
+ option, which prints only those
+ lines which match one or more models identified by
+ .I keep
+@@ -322,44 +322,44 @@ want to filter out some lines, but note that if the lines are short, then
+ the error rate can be high.
+ .PP
+ The
+-.BR -e , -w , -g , -j
++.BR \-e , \-w , \-g , \-j
+ switches are used for selecting an appropriate tokenization scheme. A token is
+ a word or word fragment or combination of words or fragments. The shape of
+ tokens is important because it forms the basis of the language models used by
+ .BR dbacl .
+ The
+-.B -e
++.B \-e
+ switch selects a predefined tokenization scheme, which is speedy but limited.
+ The
+-.B -w
++.B \-w
+ switch specifies composite tokens derived from the
+-.B -e
+-switch. For example, "-e alnum -w 2" means that tokens should be alphanumeric
++.B \-e
++switch. For example, "\-e alnum \-w 2" means that tokens should be alphanumeric
+ word fragments combined into overlapping pairs (bigrams). When the
+-.B -j
++.B \-j
+ switch is used, all tokens are converted to lowercase, which reduces the 
+ number of possible tokens and therefore memory consumption.
+ .PP
+ If the
+-.B -g
++.B \-g
+ switch is used, you can completely specify what the tokens should look like
+ using a regular expression. Several
+-.B -g
++.B \-g
+ switches can be used to construct complex tokenization schemes, and parentheses
+ within each expression can be used to select fragments and combine them into
+-n-grams. The cost of such flexibility is reduced classification and learning speed. When experimenting with tokenization schemes, try using the
+-.B -d
++n\-grams. The cost of such flexibility is reduced classification and learning speed. When experimenting with tokenization schemes, try using the
++.B \-d
+ or
+-.B -D
++.B \-D
+ switches while learning or classifying, as they will print the tokens
+ explicitly so you can see what text fragments are picked up or missed
+ out. For regular exression syntax, see
+ .BR regex (7).
+ .PP
+ The
+-.B -h
++.B \-h
+ and
+-.B -H
++.B \-H
+ switches regulate how much memory
+ .B dbacl
+ may use for learning. Text classification can use a lot of memory, and by default
+@@ -369,17 +369,17 @@ if a limit is reached, a warning message will be printed on STDERR
+ with some advice.
+ .PP
+ When relearning the same category several times, a significant speedup can be obtained by using the
+-.B -1
++.B \-1
+ switch, as this allows the previously learned probabilities to be read from the category and reused.
+ .PP
+ Note that classification accuracy depends foremost on the amount and quality of the training samples, and then only on amount of tweaking.
+ .SH EXIT STATUS
+ When using the
+-.B -l
++.B \-l
+ command form,
+ .B dbacl
+ returns zero on success. When using the
+-.B -c
++.B \-c
+ form,
+ .B dbacl
+ returns a positive integer (1,2,3...) corresponding to the
+@@ -389,44 +389,44 @@ category is chosen. If an error occurs,
+ .B dbacl
+ returns zero.
+ .SH OPTIONS
+-.IP -0
++.IP \-0
+ When learning, prevents weight preloading. Normally,
+ .B dbacl
+ checks if the category file already exists, and if so, tries to use the
+ existing weights as a starting point. This can dramatically speed up learning.
+ If the
+-.B -0
++.B \-0
+ (zero) switch is set, then
+ .B dbacl
+ behaves as if no category file already exists. This is mainly useful for testing.
+ This switch is now enabled by default, to protect against weight drift which
+ can reduce accuracy over many learning iterations. Use
+-.B -1
++.B \-1
+ to force preloading.
+-.IP -1
++.IP \-1
+ Force weight preloading if the category file already exists. See discussion of the
+-.B -0
++.B \-0
+ switch.
+-.IP -a
++.IP \-a
+ Append scores. Every input line is written to STDOUT and the dbacl scores are
+ appended. This is useful for postprocessing with
+ .BR bayesol (1).
+ For ease of processing, every original
+ input line is indented by a single space (to distinguish them from the appended scores), and the line with the scores (if
+-.B -n
++.B \-n
+ is used) is prefixed with the string "scores ". If a second copy of
+ .B dbacl
+ needs to read this output later, it should be invoked with the
+-.B -A
++.B \-A
+ switch.
+-.IP -d
++.IP \-d
+ Dump the model parameters to STDOUT. In conjunction with the
+-.B -l
+-option, this produces a human-readable summary of the maximum entropy model. In conjunction with the
+-.B -c
++.B \-l
++option, this produces a human\-readable summary of the maximum entropy model. In conjunction with the
++.B \-c
+ option, displays the contribution of each token to the final score. Suppresses all other normal output.
+-.IP -e
+-Select character class for default (not regex-based) tokenization. By default,
++.IP \-e
++Select character class for default (not regex\-based) tokenization. By default,
+ tokens are alphabetic strings only. This corresponds to the case when
+ .I deftok
+ is "alpha". Possible values for
+@@ -436,7 +436,7 @@ The last two are custom tokenizers intended for email messages.  See also
+ .BR isalpha (3).
+ The "char" tokenizer picks up single printable characters 
+ rather than bigger tokens, and is intended for testing only.
+-.IP -f
++.IP \-f
+ Filter each line of input separately, passing to STDOUT only lines
+ which match the
+ .I category
+@@ -458,11 +458,11 @@ file is a pipe or character device,
+ then an attempt is made to use line buffering mode,
+ otherwise the more
+ efficient block buffering is used.
+-.IP -g
++.IP \-g
+ Learn only features described by the extended regular expression
+ .IR regex .
+ This overrides the default feature selection method (see
+-.B -w
++.B \-w
+ option) and learns, for each line of input, only tokens constructed
+ from the concatenation of strings which match the tagged
+ subexpressions within the supplied
+@@ -482,55 +482,55 @@ be tagged. In this case,
+ should consist exclusively of digits 1 to 9, numbering exactly those subexpressions which should be tagged. Alternatively, if no parentheses exist within
+ .IR regex ,
+ then it is assumed that the whole expression must be captured.
+-.IP -h
++.IP \-h
+ Set the size of the hash table to 2^\fIsize\fP
+ elements. When using the
+-.B -l
++.B \-l
+ option, this refers to the total number of features allowed
+ in the maximum
+ entropy model being learned. When using the
+-.B -c
++.B \-c
+ option toghether with the
+-.B -M
++.B \-M
+ switch and multinomial type categories,
+ this refers to the maximum number of features taken into account during classification.
+ Without the
+-.B -M
++.B \-M
+ switch, this option has no effect.
+-.IP -i
++.IP \-i
+ Fully internationalized mode. Forces the use of wide characters internally,
+ which is necessary in some locales. This incurs a noticeable performance penalty.
+-.IP -j
++.IP \-j
+ Make features case sensitive. Normally, all features are converted to lower
+ case during processing, which reduces storage requirements and improves
+ statistical estimates for small datasets. With this option, the original
+ capitalization is used for each feature. This can improve classification
+ accuracy.
+-.IP -m
++.IP \-m
+ Aggressively maps categories into memory and locks them into
+ RAM to prevent swapping, if possible. This is useful when speed is paramount and memory is plentiful, for example when testing the classifier on large datasets.
+ .IP
+ Locking may require relaxing user limits with
+ .BR ulimit (1).
+ Ask your system administrator. Beware when using the
+-.B -m
++.B \-m
+ switch together with the
+-.B -o
++.B \-o
+ switch, as only one dbacl process must learn or classify at a time to prevent file corruption. If no learning takes place, then the
+-.B -m
++.B \-m
+ switch for classifying is always safe to use. See also the discussion for the
+-.B -o
++.B \-o
+ switch.
+-.IP -n
++.IP \-n
+ Print scores for each
+ .IR category .
+ Each score is the product of two numbers, the cross entropy and the complexity of the input text under each model. Multiplied together, they represent the log probability that the input resembles the model. To see these numbers separately, use also the
+-.B -v
++.B \-v
+ option. In conjunction with the
+-.B -f
++.B \-f
+ option, stops filtering but prints each input line prepended with a list of scores for
+ that line.
+-.IP -q
++.IP \-q
+ Select
+ .I quality
+ of learning, where
+@@ -538,7 +538,7 @@ of learning, where
+ can be 1,2,3,4. Higher values take longer to learn, and should be slightly more accurate. The default
+ .I quality
+ is 1 if the category file doesn't exist or weights cannot be preloaded, and 2 otherwise.
+-.IP -o
++.IP \-o
+ When learning, reads/writes partial token counts so they can be reused. Normally, category files are learned from exactly the input data given, and don't contain extraneous information. When this option is in effect, some extra information is
+ saved in the file
+ .IR online ,
+@@ -552,115 +552,115 @@ exists, it is read before learning, and updated afterwards. The file is approxim
+ In
+ .BR dbacl ,
+ file updates are atomic, but if using the
+-.B -o
++.B \-o
+ switch, two or more processes should not learn simultaneously, as only one
+ process will write a lasting category and memory dump. The
+-.B -m
++.B \-m
+ switch can also speed up online learning, but beware of possible corruption.
+ Only one process should read or write a file. This option is intended
+ primarily for controlled test runs. See also the
+-.B -O
+-(big-oh) switch.
+-.IP -r
++.B \-O
++(big\-oh) switch.
++.IP \-r
+ Learn the digramic reference model only. Skips the learning of extra features in
+ the text corpus.
+-.IP -v
++.IP \-v
+ Verbose mode. When learning, print out details of the computation, when classifying, print out the name of the most probable
+ .IR category .
+ In conjunction with the
+-.B -n
++.B \-n
+ option, prints the scores as an explicit product of the cross entropy and the complexity.
+-.IP -w
+-Select default features to be n-grams up to
++.IP \-w
++Select default features to be n\-grams up to
+ .IR max_order .
+ This is incompatible with the
+-.B -g
++.B \-g
+ option, which always takes precedence. If no
+-.B -w
++.B \-w
+ or
+-.B -g
++.B \-g
+ options are given,
+ .B dbacl
+ assumes
+-.B -w
+-1. Note that n-grams for n greater than 1 do not straddle line breaks by default.
++.B \-w
++1. Note that n\-grams for n greater than 1 do not straddle line breaks by default.
+ The
+-.B -S
++.B \-S
+ switch enables line straddling. 
+-.IP -x
+-Set decimation probability to 1 - 2^(\fI-decim\fP).
++.IP \-x
++Set decimation probability to 1 \- 2^(\fI\-decim\fP).
+ To reduce memory requirements when learning, some inputs are randomly skipped,
+ and only a few are added to the model.
+ Exact behaviour depends on the applicable
+-.B -T
++.B \-T
+ option (default is
+-.B -T
++.B \-T
+ "text").
+ When the type is not "email" (eg "text"), then individual input features
+-are added with probability 2^(\fI-decim\fP). When the type is "email", then
+-full input messages are added with probability 2^(\fI-decim\fP).
++are added with probability 2^(\fI\-decim\fP). When the type is "email", then
++full input messages are added with probability 2^(\fI\-decim\fP).
+ Within each such message, all features are used.
+-.IP -z
++.IP \-z
+ When learning, only take into account features whose occurrence count is strictly greater than ftreshold. By default, ftreshold is zero, so all features in the 
+ training corpus are used. A negative value of ftreshold causes dbacl to subtract
+-from the maximum observed feature count, and to use that if it is positive. For example, -z 1 means dbacl only learns features which occur at least twice in the corpus, and -z -5 means dbacl only learns the feature(s) whose occurrence count is within 4 of the global maximum.
+-.IP -A
++from the maximum observed feature count, and to use that if it is positive. For example, \-z 1 means dbacl only learns features which occur at least twice in the corpus, and \-z \-5 means dbacl only learns the feature(s) whose occurrence count is within 4 of the global maximum.
++.IP \-A
+ Expect indented input and scores. With this switch,
+ .B dbacl
+ expects input lines to be indented by a single space character (which is then skipped).
+ Lines
+ starting with any other character are ignored. This is the counterpart to the
+-.B -a
++.B \-a
+ switch above.
+ When used together with the
+-.B -a
++.B \-a
+ switch,
+ .B dbacl
+ outputs the skipped lines as they are,
+ and reinserts the space at the front of each processed
+ input line.
+-.IP -D
++.IP \-D
+ Print debug output. Do not use normally, but can be very useful for
+ displaying the list features picked up while learning.
+-.IP -F
++.IP \-F
+ For each FILE of input, print the FILE name followed by the classification result (normally
+ .B dbacl
+ only prints a single result even if multiple files are listed as input).
+-.IP -H
++.IP \-H
+ Allow hash table to grow up to a maximum of 2^\fIgsize\fP elements during learning. Initial size is given by
+-.B -h
++.B \-h
+ option.
+-.IP -L
++.IP \-L
+ Select the digramic reference measure for character transitions. The
+ .IR measure
+ can be one of "uniform", "dirichlet" or "maxent". Default is "uniform".
+-.IP -M
++.IP \-M
+ Force multinomial calculations. When learning, forces the model features to be treated multinomially. When classifying, corrects entropy scores to reflect multinomial probabilities (only applicable to multinomial type models, if present).
+ Scores will always be lower, because the ordering of features is lost.
+-.IP -N
++.IP \-N
+ Print posterior probabilities for each
+ .IR category .
+ This assumes the supplied categories form an exhaustive list of possibilities.
+ In conjunction with the
+-.B -f
++.B \-f
+ option, stops filtering but prints each input line prepended with a summary of the
+ posterior distribution for that line.
+-.IP -O
++.IP \-O
+ This switch causes the online data file named 
+ .IR ronline
+ to be merged during
+ learning. The 
+ .IR ronline
+-file must be created using the -o (little-oh) switch. 
+-Several -O data files can be merged simultaneously. This is intended to be
+-a read only version of -o, to allow piecing together of several sets of preparsed
+-data. See the description of the -o switch.
+-.IP -R
++file must be created using the \-o (little\-oh) switch. 
++Several \-O data files can be merged simultaneously. This is intended to be
++a read only version of \-o, to allow piecing together of several sets of preparsed
++data. See the description of the \-o switch.
++.IP \-R
+ Include an extra category for purely random text. The category is called "random".
+ Only makes sense when using the
+-.B -c
++.B \-c
+ option.
+-.IP -P
++.IP \-P
+ Correct the category scores to include estimated prior
+ probabilities. The prior probability estimate for each category is
+ proportional to the number of documents or, if that doesn't make
+@@ -669,12 +669,12 @@ category is learned from much more data than another. If all
+ categories are learned from approximately the same amount of data (or
+ maybe within a factor of 2), then this option should have little
+ qualitative effect.
+-.IP -S
++.IP \-S
+ Enable line straddling. This is useful together with the
+-.B -w
+-option to allow n-grams for n > 1 to ignore line breaks, so a complex token can continue
++.B \-w
++option to allow n\-grams for n > 1 to ignore line breaks, so a complex token can continue
+ past the end of the line. This is not recommended for email.
+-.IP -T
++.IP \-T
+ Specify nonstandard text format. By default,
+ .B dbacl
+ assumes that the input text is a purely
+@@ -687,7 +687,7 @@ is "text".
+ There are several types and subtypes which can be used to
+ clean the input text of extraneous tokens before actual learning or classifying
+ takes place. Each (sub)type you wish to use must be indicated with a separate
+-.B -T
++.B \-T
+ option on the command line, and automatically implies the corresponding type.
+ .IP
+ The "text" type is for unstructured plain text. No cleanup is performed. This
+@@ -716,10 +716,10 @@ in ALT attributes and various other tags. The "html:scripts" subtype forces
+ parsing of scripts, "html:styles" forces parsing of styles, "html:forms" forces
+ parsing of form values,
+ while "html:comments" forces parsing of HTML comments.
+-.IP -U
++.IP \-U
+ Print (U)nambiguity.
+ When used in conjunction with the
+-.B -v
++.B \-v
+ switch, prints scores followed by their empirical standard
+ deviations. When used alone, prints the best category, followed by an
+ estimated probability that this category choice is unambiguous. More
+@@ -732,39 +732,39 @@ e.g. if the estimated probability is lower than 50%. Formally,
+ a score of 0% means another category is equally likely to apply to
+ the input, and a score of 100% means no other category is likely to apply
+ to the input. Note that this type of confidence is unrelated to the
+-.B -X
++.B \-X
+ switch. Also, the probability estimate is usually low if the document is short, or
+ if the message contains many tokens that have never been seen before (only applies to
+ uniform digramic measure).
+-.IP -V
++.IP \-V
+ Print the program version number and exit.
+-.IP -W
+-Like -w, but prevents features from straddling newlines. See the description of
+-.BR -w .
+-.IP -X
++.IP \-W
++Like \-w, but prevents features from straddling newlines. See the description of
++.BR \-w .
++.IP \-X
+ Print the confidence in the score calculated for each
+ .IR category ,
+ when used together with the
+-.B -n
++.B \-n
+ or
+-.B -N
++.B \-N
+ switch. Prepares the model for confidence scores, when used with the
+-.B -l
++.B \-l
+ switch.
+ The confidence is an estimate of the typicality of the score, assuming
+ the null hypothesis that the
+ given category is correct. When used with the
+-.B -v
++.B \-v
+ switch alone, factorizes the score as the empirical divergence plus the shannon entropy, multiplied by complexity, in that order. The
+-.B -X
++.B \-X
+ switch is not supported in all possible models, and displays a percentage of "0.0" if it can't be calculated. Note that for unknown documents, it is quite common
+ to have confidences close to zero.
+-.IP -Y
++.IP \-Y
+ Print the cumulative media counts. Some tokenizers include a medium variable with
+ each token: for example, in email classification the word "the" can appear in the
+ subject or the body of a message, but the subject is counted as a separate medium
+ from the body. This allows the token frequencies to be kept separate, even though
+-the word is the same. Currently, up to 16 different media are supported (0-15),
++the word is the same. Currently, up to 16 different media are supported (0\-15),
+ with the following interpretation for email:
+ 
+  0	unused.
+@@ -772,20 +772,20 @@ with the following interpretation for email:
+  2	mail body or attachment in HTML format.
+  3	mail body or attachment in plain text format.
+  4	mail header unknown.
+- 5	User-Agent, Comments, Keywords, Note
+- 6	X-MS*, Categor*, Priority, Importance, Thread-*
+- 7	X-*
+- 8	List-*
+- 9	MIME-Version, Content-*
++ 5	User\-Agent, Comments, Keywords, Note
++ 6	X\-MS*, Categor*, Priority, Importance, Thread\-*
++ 7	X\-*
++ 8	List\-*
++ 9	MIME\-Version, Content\-*
+  10	Subject
+  11	To
+  12	Sender, Sent, BCC, CC, From
+- 13	Resent-*, Original-*
+- 14	Message-ID, References, In-Reply-To
+- 15	Received, Return-Path, Return-Receipt-To, Reply-To
++ 13	Resent\-*, Original\-*
++ 14	Message\-ID, References, In\-Reply\-To
++ 15	Received, Return\-Path, Return\-Receipt\-To, Reply\-To
+ 
+ The 
+-.B -Y
++.B \-Y
+ switch prints the number of tokens observed in each separate medium, in order from
+ 0 to 15.
+ .SH USAGE
+@@ -795,36 +795,36 @@ To create two category files in the current directory from two
+ text files named Mark_Twain.txt and William_Shakespeare.txt respectively, type:
+ .PP
+ .na
+-% dbacl -l twain Mark_Twain.txt
++% dbacl \-l twain Mark_Twain.txt
+ .br
+-% dbacl -l shake William_Shakespeare.txt
++% dbacl \-l shake William_Shakespeare.txt
+ .ad
+ .PP
+ Now you can classify input text, for example:
+ .PP
+ .na
+-% echo "howdy" | dbacl -v -c twain -c shake
++% echo "howdy" | dbacl \-v \-c twain \-c shake
+ .br
+ twain
+ .br
+-% echo "to be or not to be" | dbacl -v -c twain -c shake
++% echo "to be or not to be" | dbacl \-v \-c twain \-c shake
+ .br
+ shake
+ .ad
+ .PP
+ Note that the
+-.B -v
++.B \-v
+ option at least is necessary, otherwise
+ .B dbacl
+ does not print anything. The return value is
+ 1 in the first case, 2 in the second.
+ .PP
+ .ad
+-% echo "to be or not to be" | dbacl -v -N -c twain -c shake
++% echo "to be or not to be" | dbacl \-v \-N \-c twain \-c shake
+ .br
+ twain 22.63% shake 77.37%
+ .br
+-% echo "to be or not to be" | dbacl -v -n -c twain -c shake
++% echo "to be or not to be" | dbacl \-v \-n \-c twain \-c shake
+ .br
+ twain  7.04 * 6.0 shake  6.74 * 6.0 
+ .ad
+@@ -832,12 +832,12 @@ twain  7.04 * 6.0 shake  6.74 * 6.0
+ These invocations are equivalent. The numbers 6.74 and 7.04 represent how close
+ the average token is to each category, and 6.0 is the number of tokens observed. If you want to print a simple confidence
+ value together with the best category, replace
+-.B -v
++.B \-v
+ with
+-.BR -U .
++.BR \-U .
+ .PP
+ .na
+-% echo "to be or not to be" | dbacl -U -c twain -c shake
++% echo "to be or not to be" | dbacl \-U \-c twain \-c shake
+ .br
+ shake # 34%
+ .ad
+@@ -853,9 +853,9 @@ with noise lines. To filter out the noise lines from the English lines,
+ assuming you have an existing category shake say, type:
+ .PP
+ .na
+-% dbacl -c shake -f shake -R document.txt > document.txt_eng
++% dbacl \-c shake \-f shake \-R document.txt > document.txt_eng
+ .br
+-% dbacl -c shake -f random -R document.txt > document.txt_rnd
++% dbacl \-c shake \-f random \-R document.txt > document.txt_rnd
+ .ad
+ .PP
+ Note that the quality of the results will vary depending on
+@@ -864,7 +864,7 @@ It is sometimes useful to see the posterior probabilities for each line
+ without filtering:
+ .PP
+ .na
+-% dbacl -c shake -f shake -RN document.txt > document.txt_probs
++% dbacl \-c shake \-f shake \-RN document.txt > document.txt_probs
+ .ad
+ .PP
+ You can now postprocess the posterior probabilities for each line of text
+@@ -879,7 +879,7 @@ that the input text is classified as
+ Consequently, the prior probability
+ of classifying as
+ .I category2
+-is 1 -
++is 1 \-
+ .IR p1 .
+ Let
+ .I u12
+@@ -894,15 +894,15 @@ We assume there is no cost for classifying correctly.
+ Then the following command implements the optimal Bayesian decision:
+ .HP
+ .na
+-% dbacl -n -c
++% dbacl \-n \-c
+ .I category1
+--c
++\-c
+ .I category2
+ | awk '{ if($2 *
+ .I p1
+ *
+ .I u12
+-> $4 * (1 -
++> $4 * (1 \-
+ .IR p1 )
+ *
+ .IR u21 )
+@@ -927,11 +927,11 @@ file can be used to learn the three categories once a day, e.g.
+ .na
+ CATS=$HOME/.dbacl
+ .br
+-5  0 * * * dbacl -T email -l $CATS/work $MAILDIR/work
++5  0 * * * dbacl \-T email \-l $CATS/work $MAILDIR/work
+ .br
+-10 0 * * * dbacl -T email -l $CATS/personal $MAILDIR/personal
++10 0 * * * dbacl \-T email \-l $CATS/personal $MAILDIR/personal
+ .br
+-15 0 * * * dbacl -T email -l $CATS/spam $MAILDIR/spam
++15 0 * * * dbacl \-T email \-l $CATS/spam $MAILDIR/spam
+ .ad
+ .PP
+ To automatically deliver each incoming email into the appropriate folder,
+@@ -948,7 +948,7 @@ CATS=$HOME/.dbacl
+ .br
+ :0 c
+ .br
+-YAY=| dbacl -vT email -c $CATS/work -c $CATS/personal -c $CATS/spam
++YAY=| dbacl \-vT email \-c $CATS/work \-c $CATS/personal \-c $CATS/spam
+ .ad
+ .PP
+ .na
+@@ -956,7 +956,7 @@ YAY=| dbacl -vT email -c $CATS/work -c $CATS/personal -c $CATS/spam
+ .br
+ :0:
+ .br
+-* ? test -n "$YAY"
++* ? test \-n "$YAY"
+ .br
+ $MAILDIR/$YAY
+ .ad
+@@ -981,13 +981,13 @@ The default text features (tokens) read by
+ are purely alphabetic strings, which minimizes memory requirements but can
+ be unrealistic in some cases. To construct models based on alphanumeric
+ tokens, use the
+-.B -e
++.B \-e
+ switch. The example below also uses the optional
+-.B -D
++.B \-D
+ switch, which prints a list of actual tokens found in the document:
+ .PP
+ .na
+-% dbacl -e alnum -D -l twain Mark_Twain.txt | less
++% dbacl \-e alnum \-D \-l twain Mark_Twain.txt | less
+ .ad
+ .PP
+ It is also possible to override the default feature selection method used to learn
+@@ -996,7 +996,7 @@ duplicates the default feature selection method in the C locale,
+ while being much slower:
+ .HP
+ .na
+-% dbacl -l twain -g '^([[:alpha:]]+)' -g '[^[:alpha:]]([[:alpha:]]+)' Mark_Twain.txt
++% dbacl \-l twain \-g '^([[:alpha:]]+)' \-g '[^[:alpha:]]([[:alpha:]]+)' Mark_Twain.txt
+ .ad
+ .PP
+ The category twain which is obtained depends only on single alphabetic words
+@@ -1006,10 +1006,10 @@ which depends on pairs of consecutive words within each line (but pairs cannot
+ straddle a line break):
+ .HP
+ .na
+-% dbacl -l twain2 -g '(^|[^[:alpha:]])([[:alpha:]]+)||2' -g '(^|[^[:alpha:]])([[:alpha:]]+)[^[:alpha:]]+([[:alpha:]]+)||23' Mark_Twain.txt
++% dbacl \-l twain2 \-g '(^|[^[:alpha:]])([[:alpha:]]+)||2' \-g '(^|[^[:alpha:]])([[:alpha:]]+)[^[:alpha:]]+([[:alpha:]]+)||23' Mark_Twain.txt
+ .ad
+ .PP
+-More general, line based, n-gram models of all orders (up to 7) can be built in a similar way.
++More general, line based, n\-gram models of all orders (up to 7) can be built in a similar way.
+ To construct paragraph based models, you should reformat
+ the input corpora with
+ .BR awk (1)
+@@ -1038,7 +1038,7 @@ batch learning. This is the long run optimum described above. Under ideal condit
+ can classify a hundred emails per second on low end hardware (500Mhz Pentium III). Learning speed is not very much slower, but takes effectively much longer for large document
+ collections for various reasons.
+ When using the
+-.B -m
++.B \-m
+ switch, data structures are aggressively mapped into memory if possible,
+ reducing overheads for both I/O and memory allocations.
+ .PP
+@@ -1056,10 +1056,10 @@ When saving category files,
+ first writes out a temporary file in the same location, and renames it afterwards. If a problem or crash occurs during learning, the old category file is therefore left untouched. This ensures that categories can never be corrupted, no matter how many processes try to simultaneously learn or classify, and means that valid categories are available for classification at any time.
+ .PP
+ When using the
+-.B -m
++.B \-m
+ switch, file contents are memory mapped for speedy reading and writing. This,
+ together with the
+-.B -o
++.B \-o
+ switch,
+ is intended mainly for testing purposes, when tens of thousands of messages
+ must be learned and scored in a laboratory to measure
+@@ -1068,7 +1068,7 @@ accuracy. Because no file locking is attempted for performance reasons,
+ corruptions are possible, unless you make sure that only one
+ .B dbacl
+ process reads or writes any file at any given time. This is the only
+-case (-m and -o together) when corruption is possible.
++case (\-m and \-o together) when corruption is possible.
+ .SH MEMORY USE
+ .PP
+ When classifying a document,
+@@ -1078,7 +1078,7 @@ approximately the sum of the category file sizes plus a fixed small overhead.
+ The input document is consumed while being read, so its size doesn't matter,
+ but very long lines can take up space.
+ When using the 
+-.B -m
++.B \-m
+ switch, the categories are read using 
+ .BR mmap (2)
+ as available.
+@@ -1087,28 +1087,28 @@ When learning,
+ .B dbacl
+ keeps a large structure in memory which contains many objects which won't
+ be saved into the output category. The size of this structure is proportional to the number of unique tokens read, but not the size of the input documents, since they are discarded while being read. As a rough guide, this structure is
+-4x-5x the size of the final category file that is produced.   
++4x\-5x the size of the final category file that is produced.   
+ .PP
+ To prevent unchecked memory growth,
+ .B dbacl
+ allocates by default a fixed smallish amount of memory for tokens. When this space is used up, further tokens are discarded which has the effect of skewing the learned category making it less usable as more tokens are dropped. A warning is printed on STDERR in such a case.
+ .PP
+ The
+-.B -h
++.B \-h
+ switch lets you fix the initial size of the token space in powers of 2,
+-ie "-h 17" means 2^17 = 131072 possible tokens. If you type
+-"dbacl -V", you can see the number of bytes needed for each token when either learning or classifying. Multiply
++ie "\-h 17" means 2^17 = 131072 possible tokens. If you type
++"dbacl \-V", you can see the number of bytes needed for each token when either learning or classifying. Multiply
+ this number by the maximum number of possible tokens to estimate the memory
+ needed for learning. The 
+-.B -H
++.B \-H
+ switch lets
+ .B dbacl
+ grow its tables automatically if and when needed, up to a maximum specified. So if you
+-type "-H 21", then the initial size will be doubled repeatedly if necessary,
++type "\-H 21", then the initial size will be doubled repeatedly if necessary,
+ up to approximately two million unique tokens.
+ .PP
+ When learning with the
+-.B -X
++.B \-X
+ switch, a handful of input documents are also kept in RAM throughout.
+ .SH ENVIRONMENT
+ .PP
+@@ -1122,12 +1122,12 @@ filename which doesn't start with a '/' or a '.'.
+ If this signal is caught,
+ .B dbacl
+ simply exits without doing any cleanup or other operations. This signal can
+-often be sent by pressing Ctrl-C on the keyboard. See
++often be sent by pressing Ctrl\-C on the keyboard. See
+ .BR stty (1).
+ .IP "HUP, QUIT, TERM"
+ If one of these signals is caught,
+ .B dbacl
+-stops reading input and continues its operation as if no more input was available. This is a way of quitting gracefully, but note that in learning mode, a category file will be written based on the incomplete input. The QUIT signal can often be sent by pressing Ctrl-\ on the keyboard. See
++stops reading input and continues its operation as if no more input was available. This is a way of quitting gracefully, but note that in learning mode, a category file will be written based on the incomplete input. The QUIT signal can often be sent by pressing Ctrl\-\ on the keyboard. See
+ .BR stty (1).
+ .IP USR1
+ If this signal is caught,
+@@ -1135,7 +1135,7 @@ If this signal is caught,
+ reloads the current categories at the earliest feasible opportunity. This
+ is not normally useful at all, but might be in special cases, such as if
+ the
+-.B -f
++.B \-f
+ switch is invoked together with input from a long running pipe.
+ .SH NOTES
+ .PP
+@@ -1144,7 +1144,7 @@ generated category files are in binary format, and may or may not be portable
+ to systems using a different byte order architecture (this depends on how
+ .B dbacl
+ was compiled). The
+-.B -V
++.B \-V
+ switch prints out whether categories are portable, or else you can just experiment.
+ .PP
+ .B dbacl
+@@ -1162,8 +1162,8 @@ is compiled to save memory by digitizing final weights, but you can disable
+ digitization by editing dbacl.h and recompiling.
+ .PP
+ .B dbacl
+-offers several built-in tokenizers (see
+-.B -e
++offers several built\-in tokenizers (see
++.B \-e
+ switch) with more to come in future versions, as the author invents them.
+ While the default tokenizer may evolve, no tokenizer should ever be removed, so
+ that you can always simulate previous
+@@ -1171,7 +1171,7 @@ that you can always simulate previous
+ behaviour subject to bug fixes and architectural changes.
+ .PP
+ The confidence estimates obtained through the
+-.B -X
++.B \-X
+ switch are underestimates, ie are more conservative than they should be.
+ .SH BUGS
+ .PP
+diff --git a/man/hmine.1in b/man/hmine.1in
+index 1b78f32..efa3de2 100644
+--- a/man/hmine.1in
++++ b/man/hmine.1in
+@@ -5,11 +5,11 @@ hmine \- a mail message header analyzer.
+ .SH SYNOPSIS
+ .HP
+ .B hmine
+-[-vDa]
++[\-vDa]
+ [FILE]
+ .HP
+ .B hmine
+--V
++\-V
+ .SH DESCRIPTION
+ .PP
+ .B hmine
+@@ -23,13 +23,13 @@ returns 1. In case of a problem,
+ .B hmine
+ returns zero.
+ .SH OPTIONS
+-.IP -a
++.IP \-a
+ Print mailboxes and groups found in various header fields, one per line, preceded by the field name. Actual email addresses are always enclosed in '<' and '>' for easy parsing, ie anything
+ not within these delimiters is not part of an email address. Beware that not every line 
+ need contain an email address.
+-.IP -D
++.IP \-D
+ Debug output.
+-.IP -V
++.IP \-V
+ Print the program version number and exit. 
+ .SH USAGE
+ .PP
+diff --git a/man/hypex.1in b/man/hypex.1in
+index b120e83..2f71d06 100644
+--- a/man/hypex.1in
++++ b/man/hypex.1in
+@@ -5,26 +5,26 @@ hypex \- computes the Chernoff exponent between two simple categories.
+ .SH SYNOPSIS
+ .HP
+ .B hypex
+-[-hH size] [-s stepsize]
++[\-hH size] [\-s stepsize]
+ CATDUMP1 CATDUMP2
+ .HP
+ .B hmine
+--V
++\-V
+ .SH DESCRIPTION
+ .PP
+ .B hypex
+ reads two category dumps produced by dbacl(1) after learning.
+ A category dump is obtained using the 
+-.B -d
++.B \-d
+ and
+-.B -l
++.B \-l
+ switches, and is a textual representation of the feature weights which
+ exist in the binary category files. 
+ .PP
+ Given two such category dumps for simple unigram categories,
+ .B hypex
+ calculates the Kullback Leibler divergence between the probability models,
+-and prints out exponential error exponents for Neyman-Pearson hypothesis 
++and prints out exponential error exponents for Neyman\-Pearson hypothesis 
+ tests under a range of threshold values. See
+ .BR "Cover and Thomas (1991) Elements of Information Theory" ,
+ Chap. 12.
+@@ -36,15 +36,15 @@ specialized calculator.
+ .B hypex
+ returns 0 on success, 1 if an error occurs.
+ .SH OPTIONS
+-.IP -h
+-.IP -H
++.IP \-h
++.IP \-H
+ Same as dbacl(1). Selects the hash sizes in powers of two.
+-.IP -s
++.IP \-s
+ Stepsize for the threshold.
+ .B hypex
+ outputs exponents for different values of the threshold, within an 
+ interval bounded by the Kullback Leibler divergences between the categories.
+-.IP -V
++.IP \-V
+ Print the program version number and exit. 
+ .SH SOURCE
+ .PP
+diff --git a/man/mailcross.1in b/man/mailcross.1in
+index cb1ce0b..c392931 100644
+--- a/man/mailcross.1in
++++ b/man/mailcross.1in
+@@ -1,7 +1,7 @@
+ \" t
+ .TH MAILCROSS 1 "Bayesian Text Classification Tools" "Version @VERSION@" ""
+ .SH NAME
+-mailcross \- a cross-validation simulator for use with dbacl.
++mailcross \- a cross\-validation simulator for use with dbacl.
+ .SH SYNOPSIS
+ .HP
+ .B mailcross 
+@@ -12,14 +12,14 @@ mailcross \- a cross-validation simulator for use with dbacl.
+ .SH DESCRIPTION
+ .PP
+ .B mailcross
+-automates the task of cross-validating email filtering and classification
++automates the task of cross\-validating email filtering and classification
+ programs such as 
+ .BR dbacl (1).
+ Given a set of categorized documents, mailcross initiates simulation runs 
+ to estimate the classification errors and thereby permits fine tuning 
+ of the parameters of the classifier. 
+ .PP
+-Cross-validation is a method which is widely used to compare the quality 
++Cross\-validation is a method which is widely used to compare the quality 
+ of classification and learning algorithms, and as such permits rudimentary
+ comparisons between those classifiers which make use of  
+ .BR dbacl (1)
+@@ -27,8 +27,8 @@ and
+ .BR bayesol (1),
+ and other competing classifiers.
+ .PP
+-The mechanics of cross-validation are as follows: A set of pre-classified 
+-email messages is first split into a number of roughly equal-sized subsets.
++The mechanics of cross\-validation are as follows: A set of pre\-classified 
++email messages is first split into a number of roughly equal\-sized subsets.
+ For each subset, the filter (by default, 
+ .BR dbacl (1)) 
+ is used to classify each message within this subset, based upon having learned 
+@@ -41,7 +41,7 @@ attempt to capture the behaviour of classification errors over time.
+ .PP
+ .B mailcross
+ uses the environment variables MAILCROSS_LEARNER and MAILCROSS_FILTER when
+-executing, which permits the cross-validation of arbitrary filters, provided
++executing, which permits the cross\-validation of arbitrary filters, provided
+ these satisfy the compatibility conditions stated in the  
+ ENVIRONMENT section below.
+ .PP
+@@ -79,19 +79,19 @@ but should be executed at least once.
+ .IP "\fBclean\fR"
+ Deletes the directory mailcross.d and all its contents.
+ .IP "\fBlearn\fR"
+-For every previously built subset of email messages, pre-learns all 
++For every previously built subset of email messages, pre\-learns all 
+ the categories based on the contents of all the subsets except this one.
+ The 
+ .I command_arguments
+ are passed to MAILCROSS_LEARNER.
+ .IP "\fBrun\fR"
+ For every previously built subset of email messages, performs the classification
+-based upon the pre-learned categories associated with all but this subset.
++based upon the pre\-learned categories associated with all but this subset.
+ The 
+ .I command_arguments
+ are passed to MAILCROSS_FILTER.
+ .IP "\fBsummarize\fR"
+-Prints statistics for the latest cross-validation run.
++Prints statistics for the latest cross\-validation run.
+ .IP "\fBreview\fR \fItruecat\fR \fIpredcat\fR"
+ Scans the last run statistics and extracts all the messages which belong to category
+ .I truecat
+@@ -200,7 +200,7 @@ by typing, for example:
+ .PP
+ If some of the selected classifiers cannot be found on the system, they
+ are not selected. Note also that some wrappers
+-can have hard-coded category names, e.g. if the classifier only supports binary
++can have hard\-coded category names, e.g. if the classifier only supports binary
+ classification. Heed the warning messages. 
+ .PP
+ It remains only to run the simulation. Beware, this can take a long time 
+@@ -285,8 +285,8 @@ on the command line.
+ If undefined, 
+ .B mailcross
+ uses the default value
+-MAILCROSS_FILTER="dbacl -T email -T xml -v" (and 
+-also magically adds the -c option
++MAILCROSS_FILTER="dbacl \-T email \-T xml \-v" (and 
++also magically adds the \-c option
+ before each category).
+ .IP MAILCROSS_LEARNER
+ This variable contains a shell command to be executed repeatedly during the
+@@ -297,7 +297,7 @@ for learning, and the file name of the category on the command line.
+ If undefined, 
+ .B mailcross
+ uses the default value
+-MAILCROSS_LEARNER="dbacl -H 19 -T email -T xml -l".
++MAILCROSS_LEARNER="dbacl \-H 19 \-T email \-T xml \-l".
+ .IP TEMPDIR
+ This directory is exported for the benefit of wrapper scripts. Scripts which
+ need to create temporary files should place them a the location given in TEMPDIR.
+@@ -309,7 +309,7 @@ contains a full copy of the training corpora, as well as learning files for
+ times all the added categories, and various log files. 
+ .SH WARNING
+ .PP
+-Cross-validation is a widely used, but ad-hoc statistical procedure, completely
++Cross\-validation is a widely used, but ad\-hoc statistical procedure, completely
+ unrelated to Bayesian theory, and subject to controversy. 
+ Use this at your own risk.
+ .SH SOURCE
+diff --git a/man/mailinspect.1in b/man/mailinspect.1in
+index c027a5e..761d3d1 100644
+--- a/man/mailinspect.1in
++++ b/man/mailinspect.1in
+@@ -4,20 +4,20 @@
+ mailinspect \- sort an mbox by category and pipe emails to a command.
+ .SH SYNOPSIS
+ .HP
+-.B mailinspect [-zjiI]
+--c 
++.B mailinspect [\-zjiI]
++\-c 
+ .I category
+-FILE [-gG 
++FILE [\-gG 
+ .IR regex ]...
+-[-s
++[\-s
+ .IR command ]
+-[-p 
++[\-p 
+ .IR style ]
+-[-o
++[\-o
+ .IR scoring ]
+ .HP
+ .B mailinspect
+--V
++\-V
+ .SH DESCRIPTION
+ .PP
+ .B mailinspect
+@@ -28,7 +28,7 @@ which must have been
+ created by 
+ .BR dbacl (1). 
+ It can be used as a command line tool or interactively, when given the 
+-.B -I 
++.B \-I 
+ switch. 
+ .PP
+ When used as a command line tool, 
+@@ -36,19 +36,19 @@ When used as a command line tool,
+ prints the sorted list of emails on STDOUT. Each line consists of a
+ seek position for the given email within FILE, followed by the score and a description
+ string in one of several styles chosen via the 
+-.B -p
++.B \-p
+ option. 
+ .PP
+ When supplying a 
+ .I command
+ string in conjunction with the 
+-.B -s
++.B \-s
+ option, 
+ .B mailinspect
+ spawns a shell and executes 
+ .I command 
+ for every email in FILE (possibly selected via the 
+-.BR -g " or" -G
++.BR \-g " or" \-G
+ options), in the sorted order. This is similar to the 
+ .BR formail (1)
+ functionality, except the latter doesn't order the emails.
+@@ -66,61 +66,61 @@ for anything.
+ mailinspect
+ returns 1 on success, 0 if some error occurred.
+ .SH OPTIONS
+-.IP -c
++.IP \-c
+ Use 
+ .I category
+ to compute the scores and sort the emails, which 
+ should be the file name of a 
+ .BR dbacl (1)
+ category.
+-.IP -g
++.IP \-g
+ Only emails matching the regular expression
+ .I regex
+ are sorted. All other emails are ignored. When several
+-.B -g
++.B \-g
+ and 
+-.B -G
++.B \-G
+ options are present on the command line,
+ earlier regular expressions are overridden
+ by later ones where applicable.
+-.IP -i
++.IP \-i
+ Force internationalized mode. 
+-.IP -j
++.IP \-j
+ Force regular expression searches to be case sensitive.
+-.IP -o
++.IP \-o
+ Determines the scoring formula to be used. The parameter 
+ .I scoring
+ must be an integer greater than or equal to zero. By default,
+ .I scoring 
+ equals zero.
+-.IP -p
++.IP \-p
+ Prints the email index in the given style. The parameter 
+ .I style
+ must be an integer greater than or equal to zero. By default,
+ .I style
+ equals zero.
+-.IP -s
++.IP \-s
+ For each email in the list, execute the shell
+ .IR command ,
+ with the email body on STDIN. Emails are processed in sorted order.
+-.IP -z
++.IP \-z
+ Reverse sort order. Normally, emails are sorted in order of closest 
+ to furthest relative to 
+ .IR category ,
+ but in this case, the opposite is true. 
+-.IP -I
++.IP \-I
+ Interactive mode. Instead of printing the sorted list of emails
+ on STDOUT, emails are displayed and can be scrolled, viewed, 
+ searched and piped interactively at the terminal.
+-.IP -G
++.IP \-G
+ Only emails 
+ .B not
+ matching the regular expression
+ .I regex
+ are sorted. Opposite of 
+-.B -g
++.B \-g
+ switch.
+-.IP -V
++.IP \-V
+ Print the program version number and exit. 
+ .SH USAGE
+ .PP
+@@ -137,9 +137,9 @@ and
+ respectively. You can create appropriate categories by typing the commands
+ .PP
+ .na
+-% dbacl -l good good.mbox -T email
++% dbacl \-l good good.mbox \-T email
+ .br
+-% dbacl -l bad bad.mbox -T email
++% dbacl \-l bad bad.mbox \-T email
+ .ad
+ .PP
+ Next, you can type the following command to view interactively the 
+@@ -149,7 +149,7 @@ file with the emails whose score is closest to the category
+ listed first:
+ .PP
+ .na
+-% mailinspect -I -c good bad.mbox 
++% mailinspect \-I \-c good bad.mbox 
+ .ad
+ .PP
+ Alternatively, you might be interested only in the five emails in the folder 
+@@ -161,7 +161,7 @@ completely independently from any other category such as
+ (ie you want outliers in the scoring sense).
+ .PP
+ .na
+-% mailinspect -z -c bad bad.mbox | head -5
++% mailinspect \-z \-c bad bad.mbox | head \-5
+ .ad
+ .PP
+ In interactive mode, the following keys are defined:
+@@ -199,7 +199,7 @@ which don't match.
+ .IP ?
+ like /, but hides all emails which match, keeping all those which don't match.
+ .PP
+-As a convenience, the function keys F1-F10 can each be associated 
++As a convenience, the function keys F1\-F10 can each be associated 
+ with a shell command string. In this
+ case, typing a function key has the same effect as the S key, but the command is 
+ already typed and ready to be edited/accepted.

@@ -12,8 +12,9 @@ dbacl (1.14-1) unstable; urgency=low
   * Build-Depend on libncurses5-dev (Closes: #646734)
   * Update debian/copyright to conform to DEP-5
   * Update debian/watch
+  * Fix hyphenation in manpages
 
- -- Zak B. Elep <zakame@zakame.net>  Sat, 31 Mar 2012 23:36:47 +0800
+ -- Zak B. Elep <zakame@zakame.net>  Sat, 31 Mar 2012 23:55:25 +0800
 
 dbacl (1.12-2.1) unstable; urgency=low
 
