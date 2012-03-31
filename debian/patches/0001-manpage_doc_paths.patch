@@ -1,0 +1,66 @@
+From: Ryan Kavanagh <ryanakca@kubuntu.org>
+Date: Mon, 30 May 2012 10:08:30 -0400
+Subject: Fix paths for manpage
+Bug-Debian: http://bugs.debian.org/628587
+Origin: vendor
+---
+ man/Makefile.in |    2 ++
+ man/bayesol.1in |    4 ++--
+ man/dbacl.1in   |    8 ++++----
+ 3 files changed, 8 insertions(+), 6 deletions(-)
+
+diff --git a/man/Makefile.in b/man/Makefile.in
+index 7b13393..85f5c61 100644
+--- a/man/Makefile.in
++++ b/man/Makefile.in
+@@ -16,6 +16,7 @@
+ @SET_MAKE@
+ VPATH = @srcdir@
+ pkgdatadir = $(datadir)/@PACKAGE@
++pkgdocdir = /usr/share/doc/dbacl
+ pkgincludedir = $(includedir)/@PACKAGE@
+ pkglibdir = $(libdir)/@PACKAGE@
+ pkglibexecdir = $(libexecdir)/@PACKAGE@
+@@ -425,6 +426,7 @@ datarootdir ?= $(prefix)/share
+ 	cat $< \
+ 		| sed -e "s|[@]VERSION@|$(VERSION)|g" \
+ 		| sed -e "s|[@]PKGDATADIR@|$(pkgdatadir)|g" \
++		| sed -e "s|[@]PKGDOCDIR@|$(pkgdocdir)|g" \
+ 		> $@
+ 
+ # Tell versions [3.59,3.63) of GNU make to not export all variables.
+diff --git a/man/bayesol.1in b/man/bayesol.1in
+index dac8feb..83f5201 100644
+--- a/man/bayesol.1in
++++ b/man/bayesol.1in
+@@ -161,9 +161,9 @@ An invocation looks like this:
+ % dbacl -c one -c two -c three sample.txt -vna | bayesol -c toy.risk -v
+ .ad
+ .PP
+-See @PKGDATADIR@/doc/costs.ps for a description of the algorithm used.
++See @PKGDOCDIR@/costs.ps for a description of the algorithm used.
+ See also
+-@PKGDATADIR@/doc/tutorial.html for a more detailed overview.
++@PKGDOCDIR@/tutorial.html for a more detailed overview.
+ .SH SOURCE
+ .PP
+ The source code for the latest version of this program is available at the
+diff --git a/man/dbacl.1in b/man/dbacl.1in
+index 950c63b..6285642 100644
+--- a/man/dbacl.1in
++++ b/man/dbacl.1in
+@@ -76,10 +76,10 @@ towards email filtering is email.html. If you have trouble
+ getting dbacl to classify reliably, read is_it_working.html.
+ The USAGE section of this manual page
+ also has some examples.
+-.IP @PKGDATADIR@/doc/dbacl.ps
+-.IP @PKGDATADIR@/doc/tutorial.html
+-.IP @PKGDATADIR@/doc/email.html
+-.IP @PKGDATADIR@/doc/is_it_working.html
++.IP @PKGDOCDIR@/dbacl.ps
++.IP @PKGDOCDIR@/tutorial.html
++.IP @PKGDOCDIR@/email.html
++.IP @PKGDOCDIR@/is_it_working.html
+ .PP
+ .B dbacl
+ uses a maximum entropy (minimum divergence) language model constructed

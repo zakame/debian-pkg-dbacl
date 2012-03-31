@@ -1,0 +1,31 @@
+From: "Zak B. Elep" <zakame@zakame.net>
+Date: Sat, 31 Mar 2012 19:49:37 +0800
+Subject: Fix doc install path
+---
+ doc/Makefile.am       |    1 +
+ doc/chess/Makefile.am |    1 +
+ 2 files changed, 2 insertions(+)
+
+diff --git a/doc/Makefile.am b/doc/Makefile.am
+index 840036a..9e0fe22 100644
+--- a/doc/Makefile.am
++++ b/doc/Makefile.am
+@@ -1,6 +1,7 @@
+ SUBDIRS = chess
+ datarootdir ?= $(prefix)/share
+ documentationdir = $(pkgdatadir)/doc
++documentationdir = /usr/share/doc/dbacl
+ documentation_DATA = dbacl.ps costs.ps tutorial.html email.html is_it_working.html \
+ 	sample1.txt sample2.txt sample3.txt sample4.txt sample5.txt sample6.txt \
+ 	toy.risk example1.risk example2.risk example3.risk \
+diff --git a/doc/chess/Makefile.am b/doc/chess/Makefile.am
+index 751935e..b58a57c 100644
+--- a/doc/chess/Makefile.am
++++ b/doc/chess/Makefile.am
+@@ -1,5 +1,6 @@
+ datarootdir ?= $(prefix)/share
+ documentationdir = $(pkgdatadir)/doc/chess
++documentationdir = /usr/share/doc/dbacl/chess
+ documentation_DATA = dce.sh \
+ 	csfpc1.png csfpc2.png csfpc3.png down.png spoiler.png \
+ 	dce-basic.sh dce-1.sh dce-2.sh dce-3.sh \
