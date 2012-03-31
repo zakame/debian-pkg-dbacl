@@ -10,8 +10,9 @@ dbacl (1.14-1) unstable; urgency=low
   * Add doc-base stuff
   * Use dh(1) to simplify debian/rules
   * Build-Depend on libncurses5-dev (Closes: #646734)
+  * Update debian/copyright to conform to DEP-5
 
- -- Zak B. Elep <zakame@zakame.net>  Sat, 31 Mar 2012 20:46:04 +0800
+ -- Zak B. Elep <zakame@zakame.net>  Sat, 31 Mar 2012 23:09:57 +0800
 
 dbacl (1.12-2.1) unstable; urgency=low
 
