@@ -1,6 +1,7 @@
 From: Chris Lamb <chris@chris-lamb.co.uk>
 Date: Sun, 24 Aug 2008 14:10:02 +0100
 Subject: Fix bashism found by Raphael Geissert <atomo64@gmail.com>
+
 Origin: vendor, http://bugs.debian.org/cgi-bin/bugreport.cgi?msg=8;bug=489560
 Bug-Debian: http://bugs.debian.org/489560
 ---

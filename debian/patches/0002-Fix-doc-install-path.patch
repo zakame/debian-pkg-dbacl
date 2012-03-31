@@ -1,6 +1,7 @@
 From: "Zak B. Elep" <zakame@zakame.net>
 Date: Sat, 31 Mar 2012 19:49:37 +0800
 Subject: Fix doc install path
+
 ---
  doc/Makefile.am       |    1 +
  doc/chess/Makefile.am |    1 +

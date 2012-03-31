@@ -1,6 +1,7 @@
 From: Ryan Kavanagh <ryanakca@kubuntu.org>
-Date: Mon, 30 May 2012 10:08:30 -0400
+Date: Wed, 30 May 2012 10:08:30 -0400
 Subject: Fix paths for manpage
+
 Bug-Debian: http://bugs.debian.org/628587
 Origin: vendor
 ---

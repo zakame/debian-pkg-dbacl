@@ -1,3 +1,4 @@
-0001-manpage_doc_paths.patch
-0002-Fix_doc_install_path.patch
-0003-fix_bashisms.patch
+0001-Fix-paths-for-manpage.patch
+0002-Fix-doc-install-path.patch
+0003-Fix-bashism-found-by-Raphael-Geissert-atomo64-gmail..patch
+0004-Fix-typo-caught-by-lintian.patch

@@ -1,0 +1,21 @@
+From: "Zak B. Elep" <zakame@zakame.net>
+Date: Sat, 31 Mar 2012 20:23:46 +0800
+Subject: Fix typo caught by lintian
+
+---
+ man/dbacl.1in |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/man/dbacl.1in b/man/dbacl.1in
+index 6285642..7783e20 100644
+--- a/man/dbacl.1in
++++ b/man/dbacl.1in
+@@ -250,7 +250,7 @@ is used, given the input text, with a uniform prior distribution on
+ categories. For other choices of prior, see the companion utility
+ .BR bayesol (1).
+ When a single category is used, classification can
+-be done by comparing the score with a treshold. In practice however,
++be done by comparing the score with a threshold. In practice however,
+ much better results are obtained with several categories.
+ .PP
+ Learning and classifying cannot be mixed on the same command
