@@ -9,6 +9,7 @@ dbacl (1.14-1) unstable; urgency=low
     + Build-Depend on libncurses5-dev (Closes: #646734)
     + Remove duplicate fields
     + Add Vcs-* fields
+    + Update homepage
   * Add doc-base stuff
   * Use dh(1) to simplify debian/rules
   * Update debian/copyright to conform to DEP-5
@@ -19,7 +20,7 @@ dbacl (1.14-1) unstable; urgency=low
     + Fix typo in dbacl manpage
     + Fix hyphenation in manpages
 
- -- Zak B. Elep <zakame@zakame.net>  Sun, 01 Apr 2012 00:01:35 +0800
+ -- Zak B. Elep <zakame@zakame.net>  Sun, 01 Apr 2012 00:11:05 +0800
 
 dbacl (1.12-2.1) unstable; urgency=low
 
