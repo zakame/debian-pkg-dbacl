@@ -6,6 +6,8 @@ Build-Conflicts: autoconf2.13, automake1.4
 Maintainer: Zak B. Elep <zakame@zakame.net>
 Standards-Version: 3.9.3
 Homepage: http://www.lbreyer.com/gpl.html
+Vcs-Browser: https://github.com/zakame/debian-pkg-dbacl
+Vcs-Git: git://github.com/zakame/debian-pkg-dbacl.git
 
 Package: dbacl
 Architecture: any
